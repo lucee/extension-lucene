@@ -48,7 +48,7 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	}
 	
 	@Override
-	public void init(lucee.runtime.config.Config config,Resource searchDir) throws SAXException, IOException, SearchException {
+	public void init(lucee.runtime.config.Config config,Resource searchDir) throws IOException, SearchException {
 		this.config=config;
 		this.searchDir=searchDir;
 		this.searchFile=searchDir.getRealResource("search.xml");
@@ -61,6 +61,9 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	        InputSource source = new InputSource(is);
 	    	parser.parse(source);
 	    }
+	    catch (SAXException e) {
+			throw new SearchException(e);
+		}
 	    finally {
 	    	engine.getIOUtil().closeSilent(is);
 	    }
@@ -247,9 +250,7 @@ public abstract class SearchEngineSupport implements SearchEngine {
         return null;
     }
 
-    @Override
     public Element getIndexElement(Element collElement, String id) {
-        
         NodeList children = collElement.getChildNodes();
         int len=children.getLength();
         for(int i=0;i<len;i++) {
