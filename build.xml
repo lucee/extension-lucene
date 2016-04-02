@@ -127,6 +127,10 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
         <include name="**/*.jar"/>
         <exclude name="**/javax.servlet.jar"/>
         <exclude name="**/lucee.jar"/>
+        <exclude name="**/xml-xerces-*.jar"/>
+
+
+
       </fileset>
     </copy>
 
