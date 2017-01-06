@@ -31,6 +31,7 @@ public final class SearchUtil {
 	private static Map<String,Analyzer> analyzers=new ConcurrentHashMap<>();
 	
 	public static Analyzer getAnalyzer(String language) throws SearchException {
+		
         if(language==null)language="english";
         else language=language.toLowerCase().trim();
         language=org.lucee.extension.search.SearchUtil.translateLanguage(language);

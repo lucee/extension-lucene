@@ -10,9 +10,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.w3c.dom.Element;
-
-import lucee.runtime.search.*;
 import lucee.commons.io.log.Log;
 import lucee.commons.io.res.Resource;
 import lucee.commons.lock.KeyLock;
@@ -22,13 +19,20 @@ import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;
 import lucee.runtime.PageContext;
 import lucee.runtime.exp.PageException;
+import lucee.runtime.search.IndexResult;
+import lucee.runtime.search.SearchCollection;
+import lucee.runtime.search.SearchData;
+import lucee.runtime.search.SearchEngine;
+import lucee.runtime.search.SearchException;
+import lucee.runtime.search.SearchIndex;
+import lucee.runtime.search.SearchResulItem;
 import lucee.runtime.type.Collection.Key;
 import lucee.runtime.type.Query;
 import lucee.runtime.type.QueryColumn;
-import lucee.runtime.search.SearchException;
 import lucee.runtime.type.dt.DateTime;
 import lucee.runtime.util.HTTPUtil;
-import lucee.runtime.search.*;
+
+import org.w3c.dom.Element;
 
 /**
  * represent a single Collection

@@ -1,8 +1,9 @@
 package org.lucee.extension.search;
 
-import lucee.runtime.search.*;
 import java.util.HashMap;
 import java.util.Map;
+
+import lucee.runtime.search.SearchData;
 // FUTURE diese klasse entfernen, dient nur daszu die suggestion durchzuschleusen
 public class SearchDataImpl implements SearchData  {
 

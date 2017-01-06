@@ -1,6 +1,6 @@
 package org.lucee.extension.search;
 
-import lucee.runtime.search.*;
+import lucee.runtime.search.IndexResult;
 
 public final class IndexResultImpl implements IndexResult {
 	

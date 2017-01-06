@@ -1,5 +1,4 @@
 package org.lucee.extension.search;
-import lucee.runtime.search.*;
 
 
 public class AddionalAttrs {

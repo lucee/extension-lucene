@@ -1,6 +1,7 @@
 package org.lucee.extension.search;
 
-import lucee.runtime.search.*;
+import lucee.runtime.search.SearchException;
+import lucee.runtime.search.SearchResulItem;
 
 
 /**
