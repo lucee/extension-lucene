@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Iterator;
 
+import javax.xml.transform.stream.StreamResult;
+
 import lucee.commons.io.res.Resource;
 import lucee.commons.io.res.ResourceProvider;
 import lucee.loader.engine.CFMLEngine;
@@ -21,9 +23,7 @@ import lucee.runtime.type.Query;
 import lucee.runtime.type.Struct;
 import lucee.runtime.type.dt.DateTime;
 
-import org.apache.xerces.parsers.DOMParser;
-import org.apache.xml.serialize.OutputFormat;
-import org.apache.xml.serialize.XMLSerializer;
+import org.lucee.xml.XMLUtility;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -56,13 +56,14 @@ public abstract class SearchEngineSupport implements SearchEngine {
 		this.searchDir=searchDir;
 		this.searchFile=searchDir.getRealResource("search.xml");
 		if(!searchFile.exists() || searchFile.length()==0) createSearchFile(searchFile);
-		
-		DOMParser parser = new DOMParser();
+		//DOMParser parserq = new DOMParser();
 		InputStream is=null;
 	    try {
 			is = engine.getIOUtil().toBufferedInputStream(searchFile.getInputStream());
 	        InputSource source = new InputSource(is);
-	    	parser.parse(source);
+	    	//parser.parse(source);
+	    	doc=XMLUtility.parse(source, null, false);
+			
 	    }
 	    catch (SAXException e) {
 			throw new SearchException(e);
@@ -70,7 +71,7 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	    finally {
 	    	engine.getIOUtil().closeSilent(is);
 	    }
-    	doc = parser.getDocument();
+    	//doc = parser.getDocument();
     	    	
         
     	readCollections(config);
@@ -454,15 +455,18 @@ public abstract class SearchEngineSupport implements SearchEngine {
             SearchCollection sc = getCollectionByName(k.getString());
             setAttributes(collEl,sc);  
         }
-
-        OutputFormat format = new OutputFormat(doc, null, true);
-		format.setLineSeparator("\r\n");
-		format.setLineWidth(72);
+    	
+        //OutputFormat format = new OutputFormat(doc, null, true);
+		//format.setLineSeparator("\r\n");
+		//format.setLineWidth(72);
 		OutputStream os=null;
 		try {
-		    XMLSerializer serializer = new XMLSerializer(os=engine.getIOUtil().toBufferedOutputStream(searchFile.getOutputStream()), format);
-			serializer.serialize(doc.getDocumentElement());
-		} catch (IOException e) {
+			os=engine.getIOUtil().toBufferedOutputStream(searchFile.getOutputStream());
+			StreamResult result = new StreamResult(os);
+			XMLUtility.writeTo(doc.getDocumentElement(), result, false, true, null, null, null);
+			//XMLSerializer serializer = new XMLSerializer(os, format);
+			//serializer.serialize(doc.getDocumentElement());
+		} catch (Exception e) {
 		    throw new SearchException(e);
 		}
 		finally {

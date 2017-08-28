@@ -107,13 +107,6 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
     </jar>
 
 
-    <!-- copy the tlds necessary
-    <loadfile property="content1" srcFile="${tld}/formtag.tld" />
-    <replace haystack="${content1}" needle="{bundle-name}" repl="${bundlename}" property="content2"/>
-    <replace haystack="${content2}" needle="{bundle-version}" repl="${bundleversion}${build.number}" property="content3"/>
-    <echo message="${content3}"/>
-<echo message="${content3}" file="${dist}/extension/tlds/formtag.tld"/> -->
-
     <!-- copy the context necessary
     <copy todir="${dist}/extension/webcontexts">
       <fileset dir="${context}">

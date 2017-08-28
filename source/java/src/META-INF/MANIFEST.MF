@@ -13,4 +13,4 @@ Require-Bundle: apache.lucene;bundle-version=2.4.1,
  tm.extractors;bundle-version=0.4.0,
  tagsoup;bundle-version=1.2.1,
  PDFBox;bundle-version=0.7.3,
- org.lucee.xml.xerces;bundle-version=2.11.0
+ org.lucee.xml;bundle-version=1.0.0.3
