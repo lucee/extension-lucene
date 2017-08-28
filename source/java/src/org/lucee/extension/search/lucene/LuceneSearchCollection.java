@@ -198,9 +198,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
     	try {
 			writer.optimize();
 		} 
-    	catch (Throwable t) {
-			//print.printST(t);
-		}
+    	catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}
 	}
 
 	private void indexSpellCheck(String id) throws SearchException  {
@@ -265,9 +263,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
     	if(reader!=null){
     		try {
 				reader.flush();
-			} catch (Throwable t) {
-				//throw new SearchException(t);
-			}
+			} catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}
     	}
 	}
     private static void closeEL(IndexReader reader) {
@@ -275,9 +271,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
     	if(reader!=null){
     		try {
 				reader.close();
-			} catch (Throwable t) {
-				//throw new SearchException(t);
-			}
+			} catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}
     	}
 	}
 
@@ -995,7 +989,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					children[i].remove(true);
 					continue;
 				} 
-    			catch (Throwable t) {}
+    			catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}
     		}
     		if(nbr>max)max=nbr;
     	}

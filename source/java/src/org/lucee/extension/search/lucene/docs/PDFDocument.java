@@ -225,7 +225,7 @@ public final class PDFDocument
                 document.add( FieldUtil.Text( "Trapped", info.getTrapped() ) );
             }
         }
-        catch(Throwable t) {}
+        catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}
         finally {
             if( pdfDocument != null ) {
                 try {

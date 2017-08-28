@@ -21,7 +21,6 @@ public class _Highlight {
 			
 		TokenStream tokenStream = analyzer.tokenStream("", new StringReader(text));
 			return ((Highlighter)highlighter).getBestFragments(tokenStream, text, maxNumFragments, "...");
-		//}catch (Throwable t) {}
             			
 	}
 

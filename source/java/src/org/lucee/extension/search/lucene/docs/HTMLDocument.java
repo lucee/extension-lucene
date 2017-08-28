@@ -37,7 +37,8 @@ public final class HTMLDocument {
     try {
     	parser.parse(res,charset);
     } 
-    catch (Throwable t) {
+    catch(Throwable t) {
+    	if(t instanceof ThreadDeath) throw (ThreadDeath)t;
         return doc;
     }
     addContent(doc,parser);
@@ -56,8 +57,8 @@ public final class HTMLDocument {
     	  StringReader sr = new StringReader(str);
           parser.parse(sr);
       } 
-      catch (Throwable t) {
-    	  //t.printStackTrace();
+      catch(Throwable t) {
+    	  if(t instanceof ThreadDeath) throw (ThreadDeath)t;
           return doc;
       }
       

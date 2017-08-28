@@ -173,9 +173,7 @@ public final class WebCrawler {
                 		childIndexer.add(ci);
                 		ci.start();
                     }
-                    catch(Throwable t) {
-                    	//print.printST(t);
-                    }
+                    catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}
                 }
             }
     		
@@ -258,7 +256,7 @@ public final class WebCrawler {
                     		childIndexer.add(ci);
                     	}
                     }
-                    catch(Throwable t) {
+                    catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;
                     }
                 }
             }

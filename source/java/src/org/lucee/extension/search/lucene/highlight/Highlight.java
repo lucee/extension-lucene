@@ -11,7 +11,7 @@ public class Highlight {
 		try {
 			return _Highlight.createContextSummary(highlighter, analyzer, text,maxNumFragments, defaultValue);
 		}
-		catch (Throwable t) {t.printStackTrace();}	
+		catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}	
 		return defaultValue;
 	}
 
@@ -19,7 +19,7 @@ public class Highlight {
 		try {
 			return _Highlight.createHighlighter(query,highlightBegin,highlightEnd);
 		}
-		catch (Throwable t) {t.printStackTrace();}
+		catch(Throwable t) {if(t instanceof ThreadDeath) throw (ThreadDeath)t;}
 		return null;
 	}
 
