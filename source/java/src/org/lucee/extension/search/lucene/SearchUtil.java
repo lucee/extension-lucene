@@ -15,6 +15,7 @@ import org.apache.lucene.analysis.nl.DutchAnalyzer;
 import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.snowball.SnowballAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.standard.StandardTokenizer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 
 import lucee.loader.engine.CFMLEngine;
@@ -26,6 +27,9 @@ import org.lucee.extension.search.lucene.analyzer.ItalianAnalyzer;
 import org.lucee.extension.search.lucene.analyzer.NorwegianAnalyzer;
 import org.lucee.extension.search.lucene.analyzer.PortugueseAnalyzer;
 import org.lucee.extension.search.lucene.analyzer.SpanishAnalyzer;
+import org.tartarus.snowball.ext.FinnishStemmer;
+import org.tartarus.snowball.ext.HungarianStemmer;
+import org.tartarus.snowball.ext.TurkishStemmer;
 public final class SearchUtil {
 
 	private static Map<String,Analyzer> analyzers=new ConcurrentHashMap<>();
@@ -38,7 +42,7 @@ public final class SearchUtil {
 		
         Analyzer analyzer=analyzers.get(language);
         if(analyzer!=null) return analyzer;
-        
+        StandardTokenizer st=null;
         
         if(language.equals("english"))
         	analyzer= new StandardAnalyzer();
@@ -70,7 +74,6 @@ public final class SearchUtil {
         	analyzer= new CJKAnalyzer();
         else if(language.equals("korean"))
         	analyzer= new CJKAnalyzer();
-
         else if(language.equals("italian"))
         	analyzer= new ItalianAnalyzer();
         else if(language.equals("danish"))
@@ -78,10 +81,13 @@ public final class SearchUtil {
         else if(language.equals("norwegian"))
         	analyzer= new NorwegianAnalyzer();
         else if(language.equals("finnish"))
-        	analyzer= new SnowballAnalyzer( "Finnish" );
+        	analyzer=new SnowballAnalyzer( "Finnish" );
         else if(language.equals("swedish"))
         	analyzer= new SnowballAnalyzer( "Swedish" );
-        
+        else if(language.equals("hungarian"))
+        	analyzer= new SnowballAnalyzer( "Hungarian" );
+        else if(language.equals("turkish"))
+        	analyzer= new SnowballAnalyzer( "Turkish" );
         
         else {
         	CFMLEngine engine = CFMLEngineFactory.getInstance();
@@ -93,7 +99,7 @@ public final class SearchUtil {
         	}
             if(o instanceof Analyzer) analyzer=(Analyzer) o;
             else if(o==null) 
-            	 throw new SearchException("can't create Language Analyzer for Lanuage "+language+", make Analyzer ["+clazzName+"] available");
+            	 throw new SearchException("No Language Analyzer for Lanuage "+language+" found");
             else 
                 throw new SearchException( "can't create Language Analyzer for Lanuage "+language+", Analyzer ["+clazzName+"] is of invalid type");
         }        

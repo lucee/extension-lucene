@@ -68,14 +68,14 @@
 
     <echo file="${dist}/extension/META-INF/MANIFEST.MF">Manifest-Version: 1.0
 Built-Date: ${NOW}
-version: "${bundleversion}${build.number}"
+version: "${bundleversion}${build.number}${appendix}"
 id: "${id}"
 name: "${label}"
 description: "${description}"
 lucee-core-version: "${luceeCoreVersion}”
 release-type: ${releaseType}
 start-bundles: false
-search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bundleversion}${build.number}'}]"
+search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bundleversion}${build.number}${appendix}'}]"
 </echo>
 
 
@@ -97,9 +97,9 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
  
     <!-- Put everything in ${build} into .jar file -->
     <jar 
-    	jarfile="${dist}/extension/jars/lucene-search-${bundleversion}${build.number}.jar" basedir="${build}"  manifest="${src}/META-INF/MANIFEST.MF">
+    	jarfile="${dist}/extension/jars/lucene-search-${bundleversion}${build.number}${appendix}.jar" basedir="${build}"  manifest="${src}/META-INF/MANIFEST.MF">
       <manifest>
-        <attribute name="Bundle-Version" value="${bundleversion}${build.number}"/>
+        <attribute name="Bundle-Version" value="${bundleversion}${build.number}${appendix}"/>
         <attribute name="Built-Date" value="${NOW}"/>
         <attribute name="Bundle-SymbolicName" value="${bundlename}"/>
 
@@ -137,7 +137,7 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
 
 
     <!-- Zip everything  -->
-     <zip destfile="${dist}/lucene-search-${bundleversion}${build.number}.lex">
+     <zip destfile="${dist}/lucene-search-${bundleversion}${build.number}${appendix}.lex">
         <zipfileset dir="${dist}/extension"/>
     </zip>
 		
