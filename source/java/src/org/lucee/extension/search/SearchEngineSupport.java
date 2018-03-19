@@ -23,7 +23,7 @@ import lucee.runtime.type.Query;
 import lucee.runtime.type.Struct;
 import lucee.runtime.type.dt.DateTime;
 
-import org.lucee.xml.XMLUtility;
+import org.lucee.extension.search.lucene.util.XMLUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -62,10 +62,10 @@ public abstract class SearchEngineSupport implements SearchEngine {
 			is = engine.getIOUtil().toBufferedInputStream(searchFile.getInputStream());
 	        InputSource source = new InputSource(is);
 	    	//parser.parse(source);
-	    	doc=XMLUtility.parse(source, null, false);
+	    	doc=XMLUtil.parse(source, null, false);
 			
 	    }
-	    catch (SAXException e) {
+	    catch (PageException e) {
 			throw new SearchException(e);
 		}
 	    finally {
@@ -463,7 +463,7 @@ public abstract class SearchEngineSupport implements SearchEngine {
 		try {
 			os=engine.getIOUtil().toBufferedOutputStream(searchFile.getOutputStream());
 			StreamResult result = new StreamResult(os);
-			XMLUtility.writeTo(doc.getDocumentElement(), result, false, true, null, null, null);
+			XMLUtil.writeTo(doc.getDocumentElement(), result, false, true, null, null, null);
 			//XMLSerializer serializer = new XMLSerializer(os, format);
 			//serializer.serialize(doc.getDocumentElement());
 		} catch (Exception e) {
