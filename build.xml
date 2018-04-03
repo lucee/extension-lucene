@@ -10,6 +10,7 @@
   <property name="lib" location="source/java/libs"/>
   <property name="src" location="source/java/src"/>
   <property name="srcImg" location="source/images"/>
+  <property name="srcComp" location="source/components"/>
   <property name="temp" location="temp"/>
   <property name="build" location="build"/>
   <property name="dist"  location="dist"/>
@@ -134,11 +135,18 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
       </fileset>
     </copy>
 
+    <copy todir="${dist}/CFML/components">
+      <fileset dir="${srcComp}">
+        <include name="**/*.*"/>
+      </fileset>
+    </copy>
+
 
 
     <!-- Zip everything  -->
      <zip destfile="${dist}/lucene-search-${bundleversion}${build.number}${appendix}.lex">
         <zipfileset dir="${dist}/extension"/>
+        <zipfileset dir="${dist}/CFML"/>
     </zip>
 		
   </target>
