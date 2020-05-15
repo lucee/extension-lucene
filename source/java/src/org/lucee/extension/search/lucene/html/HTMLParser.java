@@ -17,18 +17,17 @@ import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;
 import lucee.runtime.exp.PageException;
 
-
 public final class HTMLParser extends Parser {
 
-    private XMLReader xmlReader;
-    private String title;
-    private String charset;
-    private StringBuffer current;
-    private StringBuffer content;
-    private boolean hasChanged;
-    private String strContent;
-    private Silent silent=new Silent(null,false);
-    //private boolean silentBefore=false;
+	private XMLReader xmlReader;
+	private String title;
+	private String charset;
+	private StringBuffer current;
+	private StringBuffer content;
+	private boolean hasChanged;
+	private String strContent;
+	private Silent silent = new Silent(null, false);
+	// private boolean silentBefore=false;
 	private String description;
 	private String keywords;
 	private String author;
@@ -36,185 +35,193 @@ public final class HTMLParser extends Parser {
 	private String custom2;
 	private String custom3;
 	private String custom4;
-	private final CFMLEngine engine; 
-    
-    
-    public HTMLParser() {
-    	engine = CFMLEngineFactory.getInstance();
-        try {
-            xmlReader=XMLReaderFactory.createXMLReader(Parser.class.getName());
-        } 
-        catch (SAXException e) {}
-        xmlReader.setContentHandler(this);
-        xmlReader.setErrorHandler(this);
-        
-    }
-    /**
-     * parse a concret url
-     * @param file
-     * @param charset
-     * @throws IOException
-     * @throws SAXException 
-     * @throws SAXException
-     * @throws PageException 
-     */
-    public synchronized void parse(File file, String charset) throws IOException, SAXException, PageException {
-        parse(engine.getCastUtil().toResource(file), charset);
-    	
-    }
+	private final CFMLEngine engine;
 
-    public synchronized void parse(Resource res, String charset) throws IOException, SAXException, PageException {
-        title="";
-        this.charset=charset;
-        current=new StringBuffer();
-        content=new StringBuffer();
-        hasChanged=false;
-        
-        Reader r=engine.getIOUtil().getReader(res,engine.getCastUtil().toCharset(charset));
-        InputSource is=new InputSource(r);
-        is.setSystemId(res.toString());
-        
-        try {
-            xmlReader.parse(is);
-        } 
-        finally {
-        	engine.getIOUtil().closeSilent(r);
-        }
-        strContent=content.toString();
-    }
-    
-	public synchronized void parse(Reader reader) throws IOException, SAXException {
-        title="";
-        this.charset=null;
-        current=new StringBuffer();
-        content=new StringBuffer();
-        hasChanged=false;
-        
-        InputSource is=new InputSource(reader);
-        
-        try {
-            xmlReader.parse(is);
-        } 
-        finally {
-        	engine.getIOUtil().closeSilent(reader);
-        }
+	public HTMLParser() {
+		engine = CFMLEngineFactory.getInstance();
+		try {
+			xmlReader = XMLReaderFactory.createXMLReader(Parser.class.getName());
+		} catch (SAXException e) {
+		}
+		xmlReader.setContentHandler(this);
+		xmlReader.setErrorHandler(this);
 
-        
-        strContent=content.toString();
-    }
-    
-    
-    
-    @Override
-    public void startElement(String uri, String name, String qName, Attributes atts)throws SAXException {
-        if(name.equalsIgnoreCase("script")) {
-            silent=new Silent(silent,true);
-        }
-        else if(name.equalsIgnoreCase("body")) {
-            silent=new Silent(silent,false);
-        }
-        else if(name.equalsIgnoreCase("meta")) {
-            doMeta(atts);
-        }
-        
-        
-        if(hasChanged==false && charset==null && name.equalsIgnoreCase("meta")){
-            if(atts.getValue("http-equiv")!=null) {
-                String value=atts.getValue("content");
-                String el;
-                String n;
-                String v;
-                if(value!=null) {
-                    try {
-                        String[] arr=engine.getListUtil().toStringArray(engine.getListUtil().toArrayRemoveEmpty(value,";"));
-                        for(int i=0;i<arr.length;i++) {
-                            el=arr[i];
-                            n=engine.getListUtil().first(el,"=",true).trim();
-                            v=engine.getListUtil().last(el,"=",true).trim();
-                            if(n.equalsIgnoreCase("charset")) {
-                                charset=v;
-                                hasChanged=true;
-                                //throw new SAXException("has found charset info");
-                            }
-                        }
-                    } 
-                    catch (PageException e) {}
-                }
-            }
-        }
-    }
-    
-    private void doMeta(Attributes atts) {
-    	String name=atts.getValue("name");
-    	if(name==null) name="";
-    	else name=name.toLowerCase().trim();
-    	
-    	if("description".equals(name))		description=atts.getValue("content");
-    	else if("keywords".equals(name))	keywords=atts.getValue("content");
-    	else if("author".equals(name))		author=atts.getValue("content");
-    	else if("custom1".equals(name))		custom1=atts.getValue("content");
-    	else if("custom2".equals(name))		custom2=atts.getValue("content");
-    	else if("custom3".equals(name))		custom3=atts.getValue("content");
-    	else if("custom4".equals(name))		custom4=atts.getValue("content");
-    	
 	}
+
+	/**
+	 * parse a concret url
+	 * 
+	 * @param file
+	 * @param charset
+	 * @throws IOException
+	 * @throws SAXException
+	 * @throws SAXException
+	 * @throws PageException
+	 */
+	public synchronized void parse(File file, String charset) throws IOException, SAXException, PageException {
+		parse(engine.getCastUtil().toResource(file), charset);
+
+	}
+
+	public synchronized void parse(Resource res, String charset) throws IOException, SAXException, PageException {
+		title = "";
+		this.charset = charset;
+		current = new StringBuffer();
+		content = new StringBuffer();
+		hasChanged = false;
+
+		Reader r = engine.getIOUtil().getReader(res, engine.getCastUtil().toCharset(charset));
+		InputSource is = new InputSource(r);
+		is.setSystemId(res.toString());
+
+		try {
+			xmlReader.parse(is);
+		} finally {
+			engine.getIOUtil().closeSilent(r);
+		}
+		strContent = content.toString();
+	}
+
+	public synchronized void parse(Reader reader) throws IOException, SAXException {
+		title = "";
+		this.charset = null;
+		current = new StringBuffer();
+		content = new StringBuffer();
+		hasChanged = false;
+
+		InputSource is = new InputSource(reader);
+
+		try {
+			xmlReader.parse(is);
+		} finally {
+			engine.getIOUtil().closeSilent(reader);
+		}
+
+		strContent = content.toString();
+	}
+
+	@Override
+	public void startElement(String uri, String name, String qName, Attributes atts) throws SAXException {
+		if (Util.isEmpty(name))
+			name = qName;
+		if (name.equalsIgnoreCase("script")) {
+			silent = new Silent(silent, true);
+		} else if (name.equalsIgnoreCase("body")) {
+			silent = new Silent(silent, false);
+		} else if (name.equalsIgnoreCase("meta")) {
+			doMeta(atts);
+		}
+
+		if (hasChanged == false && charset == null && name.equalsIgnoreCase("meta")) {
+			if (atts.getValue("http-equiv") != null) {
+				String value = atts.getValue("content");
+				String el;
+				String n;
+				String v;
+				if (value != null) {
+					try {
+						String[] arr = engine.getListUtil()
+								.toStringArray(engine.getListUtil().toArrayRemoveEmpty(value, ";"));
+						for (int i = 0; i < arr.length; i++) {
+							el = arr[i];
+							n = engine.getListUtil().first(el, "=", true).trim();
+							v = engine.getListUtil().last(el, "=", true).trim();
+							if (n.equalsIgnoreCase("charset")) {
+								charset = v;
+								hasChanged = true;
+								// throw new SAXException("has found charset info");
+							}
+						}
+					} catch (PageException e) {
+					}
+				}
+			}
+		}
+	}
+
+	private void doMeta(Attributes atts) {
+		String name = atts.getValue("name");
+		if (name == null)
+			name = "";
+		else
+			name = name.toLowerCase().trim();
+
+		if ("description".equals(name))
+			description = atts.getValue("content");
+		else if ("keywords".equals(name))
+			keywords = atts.getValue("content");
+		else if ("author".equals(name))
+			author = atts.getValue("content");
+		else if ("custom1".equals(name))
+			custom1 = atts.getValue("content");
+		else if ("custom2".equals(name))
+			custom2 = atts.getValue("content");
+		else if ("custom3".equals(name))
+			custom3 = atts.getValue("content");
+		else if ("custom4".equals(name))
+			custom4 = atts.getValue("content");
+
+	}
+
 	// <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    @Override
+	@Override
 	public void endElement(String uri, String name, String qName) {
-        if(name.equalsIgnoreCase("script")) {
-            silent=silent.parent;
-        }
-        else if(name.equalsIgnoreCase("body")) {
-            silent=silent.parent;
-        }
-        
-        String c=current.toString().trim();
-        //if(name.equals("title"))print.out(c);
-        if(c.length()>0) {
-            if(name.equalsIgnoreCase("title"))title=c;
-            else {
-                content.append(c);
-                content.append('\n');
-            }
-            current=new StringBuffer();
-        }
-    }
-    
-    
-    @Override
-    public void characters (char ch[], int start, int length)   {
-       if(!silent.value)
-        	current.append(ch,start,length);
-    }
+		if (Util.isEmpty(name))
+			name = qName;
 
+		if (name.equalsIgnoreCase("script")) {
+			silent = silent.parent;
+		} else if (name.equalsIgnoreCase("body")) {
+			silent = silent.parent;
+		}
 
-    /**
-     * @return Returns the content.
-     */
-    public String getContent() {
-        return strContent;
-    }
+		String c = current.toString().trim();
+		// if(name.equals("title"))print.out(c);
+		if (c.length() > 0) {
+			if (name.equalsIgnoreCase("title"))
+				title = c;
+			else {
+				content.append(c);
+				content.append('\n');
+			}
+			current = new StringBuffer();
+		}
+	}
 
-    /**
-     * @return Returns the title.
-     */
-    public String getTitle() {
-        return title;
-    }
+	@Override
+	public void characters(char ch[], int start, int length) {
+		if (!silent.value)
+			current.append(ch, start, length);
+	}
 
-    /**
-     * @return Returns the charset.
-     */
-    public String getCharset() {
-        return charset;
-    }
-    /**
-     * @return Returns the summary
-     */
-    public String getSummary() {
-    	return description;
-        
-    }
+	/**
+	 * @return Returns the content.
+	 */
+	public String getContent() {
+		return strContent;
+	}
+
+	/**
+	 * @return Returns the title.
+	 */
+	public String getTitle() {
+		return title;
+	}
+
+	/**
+	 * @return Returns the charset.
+	 */
+	public String getCharset() {
+		return charset;
+	}
+
+	/**
+	 * @return Returns the summary
+	 */
+	public String getSummary() {
+		return description;
+
+	}
 
 	/**
 	 * @return the keywords
@@ -227,7 +234,7 @@ public final class HTMLParser extends Parser {
 	 * @return if keywords exists
 	 */
 	public boolean hasKeywords() {
-		return !Util.isEmpty(keywords,true);
+		return !Util.isEmpty(keywords, true);
 	}
 
 	/**
@@ -241,20 +248,23 @@ public final class HTMLParser extends Parser {
 	 * @return if author exists
 	 */
 	public boolean hasAuthor() {
-		return !Util.isEmpty(author,true);
+		return !Util.isEmpty(author, true);
 	}
-	
+
 	public boolean hasCustom1() {
-		return !Util.isEmpty(custom1,true);
+		return !Util.isEmpty(custom1, true);
 	}
+
 	public boolean hasCustom2() {
-		return !Util.isEmpty(custom2,true);
+		return !Util.isEmpty(custom2, true);
 	}
+
 	public boolean hasCustom3() {
-		return !Util.isEmpty(custom3,true);
+		return !Util.isEmpty(custom3, true);
 	}
+
 	public boolean hasCustom4() {
-		return !Util.isEmpty(custom4,true);
+		return !Util.isEmpty(custom4, true);
 	}
 
 	/**
@@ -263,62 +273,57 @@ public final class HTMLParser extends Parser {
 	public String getCustom1() {
 		return custom1;
 	}
+
 	/**
 	 * @return the custom2
 	 */
 	public String getCustom2() {
 		return custom2;
 	}
+
 	/**
 	 * @return the custom3
 	 */
 	public String getCustom3() {
 		return custom3;
 	}
+
 	/**
 	 * @return the custom4
 	 */
 	public String getCustom4() {
 		return custom4;
 	}
-	
-	
-    
-    /*public static void main(String[] args) throws Exception {
-        HTMLParser parser = new HTMLParser();
-        parser.parse(new File("C:\\projects\\jmuffin\\webroot\\cfmx\\jm\\test\\tags\\_tuv.htm"),null);
-        
-        //print.ln("title:"+parser.getTitle());
-        //print.ln(parser.getContent());
-        
-        parser.parse(new File("C:\\projects\\jmuffin\\webroot\\cfmx\\jm\\test\\tags\\_tuv.htm"),"UTF-8");
-        
-        //print.ln("title:"+parser.getTitle());
-        //print.ln(parser.getContent());
-    }*/
-    
-    
-    private class Silent {
-        Silent parent;
-        boolean value;
-        /**
-         * constructor of the class
-         * @param parent
-         * @param value
-         */
-        public Silent(Silent parent, boolean value) {
-            this.parent = parent;
-            this.value = value;
-        }
-        
-    }
-    
+
+	/*
+	 * public static void main(String[] args) throws Exception { HTMLParser parser =
+	 * new HTMLParser(); parser.parse(new
+	 * File("C:\\projects\\jmuffin\\webroot\\cfmx\\jm\\test\\tags\\_tuv.htm"),null);
+	 * 
+	 * //print.ln("title:"+parser.getTitle()); //print.ln(parser.getContent());
+	 * 
+	 * parser.parse(new
+	 * File("C:\\projects\\jmuffin\\webroot\\cfmx\\jm\\test\\tags\\_tuv.htm"),
+	 * "UTF-8");
+	 * 
+	 * //print.ln("title:"+parser.getTitle()); //print.ln(parser.getContent()); }
+	 */
+
+	private class Silent {
+		Silent parent;
+		boolean value;
+
+		/**
+		 * constructor of the class
+		 * 
+		 * @param parent
+		 * @param value
+		 */
+		public Silent(Silent parent, boolean value) {
+			this.parent = parent;
+			this.value = value;
+		}
+
+	}
+
 }
-
-
-
-
-
-
-
-
