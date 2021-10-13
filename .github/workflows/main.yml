@@ -27,7 +27,7 @@ jobs:
     - name: Cache Lucee files
       uses: actions/cache@v2
       with:
-        path: _actions/zspitzer/lucee-script-engine-runner/main/lucee-download-cache
+        path: _actions/lucee/script-runner/main/lucee-download-cache
         key: lucee-downloads-${{ env.luceeVersion }}
         restore-keys: |
           lucee-downloads
@@ -44,7 +44,7 @@ jobs:
         repository: lucee/lucee
         path: lucee
     - name: Run Lucee Test Suite, testLabels="search"
-      uses: zspitzer/lucee-script-engine-runner@main
+      uses: lucee/script-runner@main
       with:
         webroot: ${{ github.workspace }}/lucee/test
         execute: /bootstrap-tests.cfm
