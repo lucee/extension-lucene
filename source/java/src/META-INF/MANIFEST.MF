@@ -12,7 +12,7 @@ Require-Bundle: apache.lucene;bundle-version=2.4.1,
  org.apache.poi;bundle-version=2.5.1,
  tm.extractors;bundle-version=0.4.0,
  tagsoup;bundle-version=1.2.1,
- org.lucee.pdfbox;bundle-version=3.0.0.RC101,
+ org.lucee.pdfbox;bundle-version=3.0.0.RC102,
  org.lucee.pdfbox-fontbox;bundle-version=3.0.0.RC1,
  org.apache.commons.logging;bundle-version=1.2.0
  
