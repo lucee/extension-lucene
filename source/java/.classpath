@@ -20,6 +20,6 @@
 	<classpathentry kind="lib" path="libs/lucee.jar"/>
 	<classpathentry kind="lib" path="libs/org.apache.commons.logging-1.2.0.jar"/>
 	<classpathentry kind="lib" path="libs/org.lucee.pdfbox-fontbox-3.0.0.RC1.jar"/>
-	<classpathentry kind="lib" path="libs/org.lucee.pdfbox-3.0.0.RC101.jar"/>
+	<classpathentry kind="lib" path="libs/org.lucee.pdfbox-3.0.0.RC102.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
