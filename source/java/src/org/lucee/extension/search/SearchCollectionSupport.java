@@ -666,7 +666,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
                 qry.setAt("key",row,record.getKey());
                 qry.setAt("url",row,url);
                 qry.setAt("collection",row,getName());
-                qry.setAt("rank",row,new Double(row));
+                qry.setAt("rank",row,Double.valueOf(row));
                 String rootPath,file;
                 String urlPath;
                 if(si!=null) {

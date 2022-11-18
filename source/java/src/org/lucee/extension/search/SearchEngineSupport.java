@@ -116,8 +116,8 @@ public abstract class SearchEngineSupport implements SearchEngine {
 		        query.setAt("path",i+1,coll.getPath().getAbsolutePath());
 		        query.setAt("registered",i+1,"CF");
 		        query.setAt("lastmodified",i+1,coll.getLastUpdate());
-		        query.setAt("size",i+1,new Double(coll.getSize()));
-		        query.setAt("doccount",i+1,new Double(coll.getDocumentCount())); 
+		        query.setAt("size",i+1,Double.valueOf(coll.getSize()));
+		        query.setAt("doccount",i+1,Double.valueOf(coll.getDocumentCount())); 
 	        }
 		    catch(PageException pe) {}
 	    }
