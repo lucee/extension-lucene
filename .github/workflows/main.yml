@@ -49,7 +49,7 @@ jobs:
         webroot: ${{ github.workspace }}/lucee/test
         execute: /bootstrap-tests.cfm
         luceeVersion: ${{ env.luceeVersion }}
-        extensionDir: ${{ github.workspace }}/distrun tests lucee with lucee-light
+        extensionDir: ${{ github.workspace }}/dist
       env:
         testLabels: search
         testAdditional: ${{ github.workspace }}/tests
