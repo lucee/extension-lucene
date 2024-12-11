@@ -51,23 +51,6 @@ jobs:
     strategy:
       matrix:
         lucee: ${{ fromJSON(vars.LUCEE_TEST_VERSIONS) }}
-    services:
-      redis:
-        # Docker Hub image
-        image: redis
-        # Set health checks to wait until redis has started
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          # Maps port 6379 on service container to the host
-          - 6379:6379
-      minio:
-        image: fclairamb/minio-github-actions
-        ports:
-          - 9000:9000
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +68,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: redis-lex-${{ matrix.lucee.version }}
+          name: lucene-lex-${{ matrix.lucee.version }}
           path: target/*.lex
 
       - name: Checkout Lucee
@@ -103,10 +86,8 @@ jobs:
           luceeVersionQuery: ${{ matrix.lucee.query }}
           extensionDir: ${{ github.workspace }}/target
         env:
-          testLabels: redis
+          testLabels: lucene
           testAdditional: ${{ github.workspace }}/tests
-          REDIS_PORT: 6379
-          REDIS_SERVER: localhost
 
   deploy:
     runs-on: ubuntu-latest
