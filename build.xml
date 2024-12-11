@@ -12,26 +12,7 @@
   <property name="srcImg" location="source/images"/>
   <property name="temp" location="temp"/>
   <property name="build" location="build"/>
-  <property name="dist"  location="dist"/>
-  
-  <buildnumber file="build.number"/>
-
-  <scriptdef name="replace" language="javascript">
-     <attribute name="haystack" />
-     <attribute name="needle" />
-     <attribute name="repl" />
-     <attribute name="property" />
-     <![CDATA[
-      var text = attributes.get("haystack");
-      var needle = attributes.get("needle");
-      var repl = attributes.get("repl");
-      text=text.trim();
-
-      var regex = new RegExp(needle,'g');
-      text=text.replace(regex,repl);
-      project.setProperty(attributes.get("property"), text);
-     ]]>
-  </scriptdef>
+  <property name="dist"  location="target"/>
 
   <path id="classpath">
     <fileset dir="${lib}">
@@ -68,17 +49,15 @@
 
     <echo file="${dist}/extension/META-INF/MANIFEST.MF">Manifest-Version: 1.0
 Built-Date: ${NOW}
-version: "${bundleversion}${build.number}${appendix}"
+version: "${bundleversion}"
 id: "${id}"
 name: "${label}"
 description: "${description}"
 lucee-core-version: "${luceeCoreVersion}"
 release-type: ${releaseType}
 start-bundles: false
-search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bundleversion}${build.number}${appendix}'}]"
+search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bundleversion}'}]"
 </echo>
-
-
   </target>
   
 
@@ -97,9 +76,9 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
  
     <!-- Put everything in ${build} into .jar file -->
     <jar 
-    	jarfile="${dist}/extension/jars/lucene-search-${bundleversion}${build.number}${appendix}.jar" basedir="${build}"  manifest="${src}/META-INF/MANIFEST.MF">
+    	jarfile="${dist}/extension/jars/lucene-search-${bundleversion}.jar" basedir="${build}"  manifest="${src}/META-INF/MANIFEST.MF">
       <manifest>
-        <attribute name="Bundle-Version" value="${bundleversion}${build.number}${appendix}"/>
+        <attribute name="Bundle-Version" value="${bundleversion}"/>
         <attribute name="Built-Date" value="${NOW}"/>
         <attribute name="Bundle-SymbolicName" value="${bundlename}"/>
 
@@ -134,10 +113,8 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
       </fileset>
     </copy>
 
-
-
     <!-- Zip everything  -->
-     <zip destfile="${dist}/lucene-search-${bundleversion}${build.number}${appendix}.lex">
+     <zip destfile="${dist}/${filename}-${bundleversion}.lex">
         <zipfileset dir="${dist}/extension"/>
     </zip>
 		
