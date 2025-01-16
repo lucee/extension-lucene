@@ -4,18 +4,15 @@ import java.io.IOException;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.search.Hits;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.TopDocs;
+import org.lucee.extension.search.lucene.highlight.Highlight;
 
 import lucee.runtime.search.SearchException;
 import lucee.runtime.search.SearchResulItem;
 
-import org.lucee.extension.search.lucene.highlight.Highlight;
-
 public class SearchResulItemHits implements SearchResulItem {
 
-	
-	
-	private Hits hits;
 	private int index;
 	private Object highlighter;
 	private Analyzer analyzer;
@@ -25,18 +22,21 @@ public class SearchResulItemHits implements SearchResulItem {
 	private int maxNumFragments;
 	private int maxLength;
 	private Document doc;
+	private TopDocs topDocs;
+	private IndexSearcher searcher;
 
-	public SearchResulItemHits(Hits hits, int index, Object highlighter,Analyzer analyzer,
-			String id, String categoryTree, String category,int maxNumFragments, int maxLength) {
-		this.hits=hits;
-		this.index=index;
-		this.highlighter=highlighter;
-		this.analyzer=analyzer;
-		this.id=id;
-		this.categoryTree=categoryTree;
-		this.category=category;
-		this.maxNumFragments=maxNumFragments;
-		this.maxLength=maxLength;
+	public SearchResulItemHits(IndexSearcher searcher, TopDocs topDocs, int index, Object highlighter,
+			Analyzer analyzer, String id, String categoryTree, String category, int maxNumFragments, int maxLength) {
+		this.searcher = searcher;
+		this.topDocs = topDocs;
+		this.index = index;
+		this.highlighter = highlighter;
+		this.analyzer = analyzer;
+		this.id = id;
+		this.categoryTree = categoryTree;
+		this.category = category;
+		this.maxNumFragments = maxNumFragments;
+		this.maxLength = maxLength;
 	}
 
 	@Override
@@ -73,16 +73,20 @@ public class SearchResulItemHits implements SearchResulItem {
 	public String getCustom4() {
 		return doc("custom4");
 	}
-    
-    @Override
+
+	@Override
 	public String getCustom(int index) throws SearchException {
-    	if(index==1) return doc("custom1");
-    	if(index==2) return doc("custom2");
-    	if(index==3) return doc("custom3");
-    	if(index==4) return doc("custom4");
-    	
-        throw new SearchException("invalid index ["+index+"], valid index is [1,2,3,4]");
-    }
+		if (index == 1)
+			return doc("custom1");
+		if (index == 2)
+			return doc("custom2");
+		if (index == 3)
+			return doc("custom3");
+		if (index == 4)
+			return doc("custom4");
+
+		throw new SearchException("invalid index [" + index + "], valid index is [1,2,3,4]");
+	}
 
 	@Override
 	public String getId() {
@@ -104,13 +108,12 @@ public class SearchResulItemHits implements SearchResulItem {
 		// TODO Auto-generated method stub
 		return 0;
 	}
-    
 
 	@Override
 	public float getScore() {
 		try {
-			return hits.score(index);
-		} catch (IOException e) {
+			return topDocs.scoreDocs[index].score;
+		} catch (Exception e) {
 			return 0;
 		}
 	}
@@ -137,17 +140,18 @@ public class SearchResulItemHits implements SearchResulItem {
 
 	@Override
 	public String getContextSummary() {
-		String contextSummary="";
-		if(maxNumFragments>0){
-			contextSummary=Highlight.createContextSummary(highlighter,analyzer,doc("contents"),maxNumFragments,maxLength,"");
+		String contextSummary = "";
+		if (maxNumFragments > 0) {
+			contextSummary = Highlight.createContextSummary(highlighter, analyzer, doc("contents"), maxNumFragments,
+					maxLength, "");
 		}
 		return contextSummary;
 	}
 
 	private String doc(String field) {
-		if(doc==null){
+		if (doc == null) {
 			try {
-				doc=hits.doc(index);
+				doc = searcher.doc(topDocs.scoreDocs[index].doc);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
