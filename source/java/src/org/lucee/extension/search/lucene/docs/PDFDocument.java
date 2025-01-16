@@ -1,20 +1,22 @@
 package org.lucee.extension.search.lucene.docs;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.util.Date;
 
+import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.lucene.document.DateField;
 import org.apache.lucene.document.Document;
 import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import org.apache.pdfbox.text.PDFTextStripper;
 
 import lucee.commons.io.res.Resource;
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;
+import lucee.loader.util.Util;
 import lucee.runtime.util.IO;
 
 /**
@@ -103,7 +105,7 @@ public final class PDFDocument {
 	 */
 	public static Document getDocument(StringBuffer content, InputStream is) {
 		Document document = new Document();
-		addContent(content, document, is);
+		addContent(content, document, is, false);
 		return document;
 	}
 
@@ -135,102 +137,32 @@ public final class PDFDocument {
 		// document.add(new Field("uid", uid, Field.Store.NO,Field.Index.UN_TOKENIZED));
 		// document.add(new Field("uid", uid, false, true, false));
 
-		InputStream is = null;
-		try {
-			is = io.toBufferedInputStream(res.getInputStream());
-			addContent(null, document, is);
-		} catch (IOException ioe) {
-
-		} finally {
-			io.closeSilent(is);
-		}
-
-		// return the document
-
+		addContent(null, document, res);
 		return document;
 	}
 
-	/**
-	 * This will add the contents to the lucene document.
-	 * 
-	 * @param content
-	 *
-	 * @param document
-	 *            The document to add the contents to.
-	 * @param is
-	 *            The stream to get the contents from.
-	 * @param documentLocation
-	 *            The location of the document, used just for debug messages.
-	 *
-	 * @throws IOException
-	 *             If there is an error parsing the document.
-	 */
-	private static void addContent(StringBuffer content, Document document, InputStream is) {
+	private static void addContent(StringBuffer content, Document document, Resource res) {
+		if (!(res instanceof File)) {
+			try {
+				addContent(content, document, res.getInputStream(), true);
+			} catch (IOException e) {
+			}
+			return;
+		}
 
-		PDDocument pdfDocument = null;
+		org.apache.pdfbox.pdmodel.PDDocument pdfDocument = null;
 		try {
-			pdfDocument = Loader.loadPDF(is);
+			pdfDocument = Loader.loadPDF((File) res);
 
 			if (pdfDocument.isEncrypted()) {
 				pdfDocument.close();
 				// Just try using the default password and move on
-				pdfDocument = Loader.loadPDF(is, "");
+				pdfDocument = Loader.loadPDF((File) res, "");
 			}
+			_addContent(content, document, pdfDocument);
 
-			// create a writer where to append the text content.
-			StringWriter writer = new StringWriter();
-			PDFTextStripper stripper = new PDFTextStripper();
-			stripper.writeText(pdfDocument, writer);
-
-			// Note: the buffer to string operation is costless;
-			// the char array value of the writer buffer and the content string
-			// is shared as long as the buffer content is not modified, which will
-			// not occur here.
-			String contents = writer.getBuffer().toString();
-			if (content != null)
-				content.append(contents);
-
-			FieldUtil.setRaw(document, contents);
-			FieldUtil.setContent(document, contents);
-			FieldUtil.setSummary(document, WordDocument.max(contents, SUMMERY_SIZE, ""), false);
-
-			PDDocumentInformation info = pdfDocument.getDocumentInformation();
-			if (info.getAuthor() != null) {
-				FieldUtil.setAuthor(document, info.getAuthor());
-			}
-			if (info.getCreationDate() != null) {
-				Date date = info.getCreationDate().getTime();
-				if (date.getTime() >= 0) {
-					document.add(FieldUtil.Text("CreationDate", DateField.dateToString(date)));
-				}
-			}
-			if (info.getCreator() != null) {
-				document.add(FieldUtil.Text("Creator", info.getCreator()));
-			}
-			if (info.getKeywords() != null) {
-				FieldUtil.setKeywords(document, info.getKeywords());
-			}
-			if (info.getModificationDate() != null) {
-				Date date = info.getModificationDate().getTime();
-				if (date.getTime() >= 0) {
-					document.add(FieldUtil.Text("ModificationDate", DateField.dateToString(date)));
-				}
-			}
-			if (info.getProducer() != null) {
-				document.add(FieldUtil.Text("Producer", info.getProducer()));
-			}
-			if (info.getSubject() != null) {
-				document.add(FieldUtil.Text("Subject", info.getSubject()));
-			}
-			if (info.getTitle() != null) {
-				FieldUtil.setTitle(document, info.getTitle());
-			}
-			if (info.getTrapped() != null) {
-				document.add(FieldUtil.Text("Trapped", info.getTrapped()));
-			}
-		} catch (Throwable t) {
-			if (t instanceof ThreadDeath)
-				throw (ThreadDeath) t;
+		} catch (IOException ioe) {
+			// TODO Log
 		} finally {
 			if (pdfDocument != null) {
 				try {
@@ -240,5 +172,89 @@ public final class PDFDocument {
 				}
 			}
 		}
+	}
+
+	private static void addContent(StringBuffer content, Document document, InputStream is, boolean closeStream) {
+		org.apache.pdfbox.pdmodel.PDDocument pdfDocument = null;
+		try {
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			Util.copy(is, baos, closeStream, true);
+			byte[] barr = baos.toByteArray();
+			pdfDocument = Loader.loadPDF(barr);
+
+			if (pdfDocument.isEncrypted()) {
+				pdfDocument.close();
+				// Just try using the default password and move on
+				pdfDocument = Loader.loadPDF(barr, "");
+			}
+			_addContent(content, document, pdfDocument);
+		} catch (IOException ioe) {
+			// TODO Log
+		} finally {
+			if (pdfDocument != null) {
+				try {
+					pdfDocument.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	private static void _addContent(StringBuffer content, Document document,
+			org.apache.pdfbox.pdmodel.PDDocument pdfDocument) throws IOException {
+
+		// create a writer where to append the text content.
+		StringWriter writer = new StringWriter();
+		PDFTextStripper stripper = new PDFTextStripper();
+		stripper.writeText(pdfDocument, writer);
+
+		// Note: the buffer to string operation is costless;
+		// the char array value of the writer buffer and the content string
+		// is shared as long as the buffer content is not modified, which will
+		// not occur here.
+		String contents = writer.getBuffer().toString();
+		if (content != null)
+			content.append(contents);
+
+		FieldUtil.setRaw(document, contents);
+		FieldUtil.setContent(document, contents);
+		FieldUtil.setSummary(document, WordDocument.max(contents, SUMMERY_SIZE, ""), false);
+
+		PDDocumentInformation info = pdfDocument.getDocumentInformation();
+		if (info.getAuthor() != null) {
+			FieldUtil.setAuthor(document, info.getAuthor());
+		}
+		if (info.getCreationDate() != null) {
+			Date date = info.getCreationDate().getTime();
+			if (date.getTime() >= 0) {
+				document.add(FieldUtil.Text("CreationDate", DateField.dateToString(date)));
+			}
+		}
+		if (info.getCreator() != null) {
+			document.add(FieldUtil.Text("Creator", info.getCreator()));
+		}
+		if (info.getKeywords() != null) {
+			FieldUtil.setKeywords(document, info.getKeywords());
+		}
+		if (info.getModificationDate() != null) {
+			Date date = info.getModificationDate().getTime();
+			if (date.getTime() >= 0) {
+				document.add(FieldUtil.Text("ModificationDate", DateField.dateToString(date)));
+			}
+		}
+		if (info.getProducer() != null) {
+			document.add(FieldUtil.Text("Producer", info.getProducer()));
+		}
+		if (info.getSubject() != null) {
+			document.add(FieldUtil.Text("Subject", info.getSubject()));
+		}
+		if (info.getTitle() != null) {
+			FieldUtil.setTitle(document, info.getTitle());
+		}
+		if (info.getTrapped() != null) {
+			document.add(FieldUtil.Text("Trapped", info.getTrapped()));
+		}
+
 	}
 }

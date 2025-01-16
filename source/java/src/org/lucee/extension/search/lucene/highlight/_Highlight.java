@@ -14,23 +14,23 @@ import lucee.loader.util.Util;
 
 public class _Highlight {
 
-	public static String createContextSummary(Object highlighter, Analyzer analyzer, String text, int maxNumFragments,String defaultValue) throws IOException {
-		//try {
-		if(!(highlighter instanceof Highlighter) || analyzer==null || Util.isEmpty(text))
+	public static String createContextSummary(Object highlighter, Analyzer analyzer, String text, int maxNumFragments,
+			String defaultValue) throws IOException {
+		// try {
+		if (!(highlighter instanceof Highlighter) || analyzer == null || Util.isEmpty(text))
 			return defaultValue;
-			
+
 		TokenStream tokenStream = analyzer.tokenStream("", new StringReader(text));
-			return ((Highlighter)highlighter).getBestFragments(tokenStream, text, maxNumFragments, "...");
-            			
+		return ((Highlighter) highlighter).getBestFragments(tokenStream, text, maxNumFragments, "...");
+
 	}
 
-	public static Object createHighlighter(Query query,String highlightBegin,String highlightEnd) {
-		
-			return new Highlighter(
-					//new SimpleHTMLFormatter("<span class=\"matching-term\">","</span>"),
-					new SimpleHTMLFormatter(highlightBegin,highlightEnd),
-					new QueryScorer(query));
-		
+	public static Object createHighlighter(Query query, String highlightBegin, String highlightEnd) {
+
+		return new Highlighter(
+				// new SimpleHTMLFormatter("<span class=\"matching-term\">","</span>"),
+				new SimpleHTMLFormatter(highlightBegin, highlightEnd), new QueryScorer(query));
+
 	}
 
 }
