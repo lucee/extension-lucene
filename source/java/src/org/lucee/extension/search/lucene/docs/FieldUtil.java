@@ -2,21 +2,23 @@ package org.lucee.extension.search.lucene.docs;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.TextField;
 
 import lucee.loader.util.Util;
 
 public class FieldUtil {
 
 	public static Field UnIndexed(String name, String value) {
-		return new Field(name, value, Field.Store.YES, Field.Index.NO);
+		return new StoredField(name, value);
 	}
 
-	public static Field Text(String name, String value) {// print.out("text:"+name);
-		return new Field(name, value, Field.Store.YES, Field.Index.ANALYZED);
+	public static Field Text(String name, String value) {
+		return new TextField(name, value, Field.Store.YES);
 	}
 
 	public static Field Text(String name, String value, boolean store) {
-		return new Field(name, value, store ? Field.Store.YES : Field.Store.NO, Field.Index.ANALYZED);
+		return new TextField(name, value, store ? Field.Store.YES : Field.Store.NO);
 	}
 
 	public static void setTitle(Document doc, String title) {

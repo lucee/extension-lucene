@@ -11,6 +11,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.FuzzyQuery;
 import org.apache.lucene.search.PhraseQuery;
@@ -82,10 +83,11 @@ public final class Simple {
 
 		// make never foud query if quey is empty
 		if (criteria.length() == 0) {
-			BooleanQuery bool = new BooleanQuery();
-			bool.add(new TermQuery(new Term(FIELD, "dshnuiaslfspfhsadhfisd")), OccurUtil.toOccur(false, true));
-			results.put(criteria, bool);
-			return bool;
+			BooleanQuery.Builder bool = new BooleanQuery.Builder();
+			bool.add(new TermQuery(new Term(FIELD, "dshnuiaslfspfhsadhfisd")), BooleanClause.Occur.MUST_NOT);
+			BooleanQuery query = bool.build();
+			results.put(criteria, query);
+			return query;
 		}
 
 		ParserString ps = new ParserString(criteria);
@@ -101,12 +103,11 @@ public final class Simple {
 		// OR
 		while (ps.isValidIndex() && ps.forwardIfCurrent(OR) || ps.forwardIfCurrent(',')) {
 			ps.removeSpace();
-			BooleanQuery bool = new BooleanQuery();
+			BooleanQuery.Builder bool = new BooleanQuery.Builder();
 
-			bool.add(query, OccurUtil.toOccur(false, false));
-			// bool.add(query, false, false);
-			bool.add(andOp(ps), OccurUtil.toOccur(false, false));
-			query = bool;
+			bool.add(query, BooleanClause.Occur.SHOULD);
+			bool.add(andOp(ps), BooleanClause.Occur.SHOULD);
+			query = bool.build();
 		}
 		return query;
 	}
@@ -118,10 +119,11 @@ public final class Simple {
 		// AND
 		while (ps.isValidIndex() && ps.forwardIfCurrent(AND)) {
 			ps.removeSpace();
-			BooleanQuery bool = new BooleanQuery();
-			bool.add(query, OccurUtil.toOccur(true, false));
-			bool.add(notOp(ps), OccurUtil.toOccur(true, false));
-			query = bool;
+			BooleanQuery.Builder bool = new BooleanQuery.Builder();
+
+			bool.add(query, BooleanClause.Occur.MUST);
+			bool.add(notOp(ps), BooleanClause.Occur.MUST);
+			query = bool.build();
 		}
 		return query;
 	}
@@ -130,9 +132,9 @@ public final class Simple {
 		// NOT
 		if (ps.isValidIndex() && ps.forwardIfCurrent(NOT)) {
 			ps.removeSpace();
-			BooleanQuery bool = new BooleanQuery();
-			bool.add(clip(ps), OccurUtil.toOccur(false, true));
-			return bool;
+			BooleanQuery.Builder bool = new BooleanQuery.Builder();
+			bool.add(clip(ps), BooleanClause.Occur.MUST_NOT);
+			return bool.build();
 		}
 		return clip(ps);
 	}
@@ -256,14 +258,14 @@ public final class Simple {
 			}
 
 			// Create phrase query
-			PhraseQuery q = new PhraseQuery();
-			q.setSlop(0);
+			PhraseQuery.Builder builder = new PhraseQuery.Builder();
+			builder.setSlop(0); // Set the slop
 
 			for (String term : terms) {
-				q.add(new Term(FIELD, term));
+				builder.add(new Term(FIELD, term)); // Add each term
 			}
 
-			return q;
+			return builder.build();
 		}
 
 		private String toContent() {
