@@ -7,7 +7,7 @@ import java.io.StringWriter;
 import java.util.Date;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
-import org.apache.lucene.document.DateField;
+import org.apache.lucene.document.DateTools;
 import org.apache.lucene.document.Document;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
@@ -128,7 +128,7 @@ public final class PDFDocument {
 		document.add(FieldUtil.UnIndexed("path", res.getPath()));
 
 		String uid = res.getPath().replace(FILE_SEPARATOR, '\u0000') + "\u0000"
-				+ DateField.timeToString(res.lastModified());
+				+ DateTools.timeToString(res.lastModified(), DateTools.Resolution.MILLISECOND);
 		document.add(FieldUtil.Text("uid", uid, false));
 
 		// Add the uid as a field, so that index can be incrementally maintained.
@@ -228,7 +228,8 @@ public final class PDFDocument {
 		if (info.getCreationDate() != null) {
 			Date date = info.getCreationDate().getTime();
 			if (date.getTime() >= 0) {
-				document.add(FieldUtil.Text("CreationDate", DateField.dateToString(date)));
+				document.add(FieldUtil.Text("CreationDate",
+						DateTools.timeToString(date.getTime(), DateTools.Resolution.MILLISECOND)));
 			}
 		}
 		if (info.getCreator() != null) {
@@ -240,7 +241,8 @@ public final class PDFDocument {
 		if (info.getModificationDate() != null) {
 			Date date = info.getModificationDate().getTime();
 			if (date.getTime() >= 0) {
-				document.add(FieldUtil.Text("ModificationDate", DateField.dateToString(date)));
+				document.add(FieldUtil.Text("ModificationDate",
+						DateTools.timeToString(date.getTime(), DateTools.Resolution.MILLISECOND)));
 			}
 		}
 		if (info.getProducer() != null) {

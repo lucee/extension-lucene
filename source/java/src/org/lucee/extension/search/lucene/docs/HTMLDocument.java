@@ -3,15 +3,14 @@ package org.lucee.extension.search.lucene.docs;
 import java.io.Reader;
 import java.io.StringReader;
 
-import org.apache.lucene.document.DateField;
+import org.apache.lucene.document.DateTools;
 import org.apache.lucene.document.Document;
+import org.lucee.extension.search.lucene.html.HTMLParser;
 
 import lucee.commons.io.res.Resource;
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;
-
-import org.lucee.extension.search.lucene.html.HTMLParser;
 
 /** A utility for making Lucene Documents for HTML documents. */
 
@@ -19,7 +18,8 @@ public final class HTMLDocument {
 	private static final char FILE_SEPARATOR = System.getProperty("file.separator").charAt(0);
 
 	public static String uid(Resource f) {
-		return f.getPath().replace(FILE_SEPARATOR, '\u0000') + "\u0000" + DateField.timeToString(f.lastModified());
+		return f.getPath().replace(FILE_SEPARATOR, '\u0000') + '\u0000'
+				+ DateTools.timeToString(f.lastModified(), DateTools.Resolution.MILLISECOND);
 	}
 
 	public static String uid2url(String uid) {

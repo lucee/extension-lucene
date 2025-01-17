@@ -226,31 +226,32 @@ public final class Simple {
 		}
 
 		private PhraseQuery toPhraseQuery() {
-			TokenStream source = analyzer.tokenStream(FIELD, new StringReader(content));
+			TokenStream source = null;
 			List<String> terms = new ArrayList<>();
 
 			try {
-				// Reset the stream - required in Lucene 3.x
-				source.reset();
-
-				// Use AttributeSource instead of Token
+				source = analyzer.tokenStream(FIELD, new StringReader(content));
 				CharTermAttribute termAtt = source.addAttribute(CharTermAttribute.class);
+
+				// Reset the stream - required in 4.x
+				source.reset();
 
 				// Collect terms
 				while (source.incrementToken()) {
 					terms.add(termAtt.toString());
 				}
 
-				// End the stream
 				source.end();
 
 			} catch (IOException e) {
-				// Handle exception appropriately
+				// Consider logging or wrapping in a RuntimeException if needed
 			} finally {
-				try {
-					source.close();
-				} catch (IOException e) {
-					// ignore
+				if (source != null) {
+					try {
+						source.close();
+					} catch (IOException e) {
+						// ignore
+					}
 				}
 			}
 
