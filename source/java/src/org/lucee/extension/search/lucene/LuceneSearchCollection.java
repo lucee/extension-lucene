@@ -13,16 +13,15 @@ import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.apache.lucene.queryParser.ParseException;
-import org.apache.lucene.queryParser.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.spell.Dictionary;
 import org.apache.lucene.search.spell.LuceneDictionary;
@@ -79,7 +78,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 	private final CFMLEngine engine;
 
-	private IndexWriterConfig config;
 	private static final SerializableObject token = new SerializableObject();
 
 	/**
@@ -148,7 +146,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			try {
 				writer = _getWriter(id, true);
 				_index(writer, res, res.getName());
-				writer.optimize();
+				writer.forceMerge(1); // replaced optimize() with forceMerge(1)
 			} catch (SearchException e) {
 				throw e;
 			} catch (Exception e) {
@@ -175,7 +173,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				writer = _getWriter(id, true);
 				doccount = _list(0, writer, dir, new LuceneExtensionFileFilter(extensions, recurse), "");
 				// optimizeEL(writer);
-				writer.optimize();
+				optimize(writer);
 			} catch (SearchException e) {
 				throw e;
 			} catch (Exception e) {
@@ -189,18 +187,22 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		return new IndexResultImpl(0, 0, doccount);
 	}
 
+	private void optimize(IndexWriter writer) throws IOException {
+		writer.forceMerge(1);
+	}
+
 	private void optimizeEL(IndexWriter writer) {
 		if (writer == null)
 			return;
 		try {
-			writer.optimize();
+			optimize(writer);
 		} catch (Throwable t) {
 			if (t instanceof ThreadDeath)
 				throw (ThreadDeath) t;
 		}
 	}
 
-	private void indexSpellCheck(String id) throws SearchException {
+	private void indexSpellCheckOld(String id) throws SearchException {
 		if (!spellcheck)
 			return;
 
@@ -220,9 +222,33 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		} catch (Exception e) {
 			throw new SearchException(e);
 		} finally {
-			flushEL(reader);
 			closeEL(reader);
 		}
+	}
+
+	private void indexSpellCheck(String id) throws SearchException {
+		if (!spellcheck)
+			return;
+
+		IndexReader reader = null;
+		FSDirectory spellDir = null;
+
+		Resource dir = _createSpellDirectory(id);
+		try {
+			spellDir = FSDirectory.open(engine.getCastUtil().toFile(dir));
+			SpellChecker spellChecker = new SpellChecker(spellDir);
+
+			reader = _getReader(id, false);
+			Dictionary dictionary = new LuceneDictionary(reader, "contents");
+
+			spellChecker.indexDictionary(dictionary, _getConfig(), true);
+
+		} catch (Exception e) {
+			throw new SearchException(e);
+		} finally {
+			closeEL(reader);
+		}
+
 	}
 
 	private void close(IndexWriter writer) throws SearchException {
@@ -242,28 +268,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				reader.close();
 			} catch (IOException e) {
 				throw new SearchException(e);
-			}
-		}
-	}
-
-	private static void close(Searcher searcher) throws SearchException {
-		if (searcher != null) {
-			try {
-				searcher.close();
-			} catch (IOException e) {
-				throw new SearchException(e);
-			}
-		}
-	}
-
-	private static void flushEL(IndexReader reader) {
-		// print.out("r-closeEL");
-		if (reader != null) {
-			try {
-				reader.flush();
-			} catch (Throwable t) {
-				if (t instanceof ThreadDeath)
-					throw (ThreadDeath) t;
 			}
 		}
 	}
@@ -299,7 +303,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				writer = _getWriter(id, true);
 				new WebCrawler(log).parse(writer, url, extensions, recurse, timeout);
 
-				writer.optimize();
+				optimize(writer);
 			} catch (SearchException e) {
 				throw e;
 			} catch (Exception e) {
@@ -533,9 +537,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	public SearchResulItem[] _search(SearchData data, String criteria, String language, short type, String categoryTree,
 			String[] category) throws SearchException {
 		try {
-
 			if (type != SEARCH_TYPE_SIMPLE)
 				throw new SearchException("search type explicit not supported");
+
 			Analyzer analyzer = SearchUtil.getAnalyzer(language);
 			Query query = null;
 			Op op = null;
@@ -547,44 +551,41 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			int maxrows = aa.getMaxrows();
 
 			if (!criteria.equals("*")) {
-				// FUTURE take this data from calling parameters
 				op = queryParser.parseOp(criteria);
 				if (op == null)
 					criteria = "*";
 				else
 					criteria = op.toString();
-				try {
 
-					query = new QueryParser(CommonUtil.VERSION, "contents", analyzer).parse(criteria);
-					highlighter = Highlight.createHighlighter(query, aa.getContextHighlightBegin(),
-							aa.getContextHighlightEnd());
-
-				} catch (ParseException e) {
-					throw new SearchException(e);
-				}
+				query = new QueryParser(CommonUtil.VERSION, "contents", analyzer).parse(criteria);
+				highlighter = Highlight.createHighlighter(query, aa.getContextHighlightBegin(),
+						aa.getContextHighlightEnd());
 			}
 
 			Resource[] files = _getIndexDirectories();
 
 			if (files == null)
 				return new SearchResulItem[0];
+
 			ArrayList<SearchResulItem> list = new ArrayList<SearchResulItem>();
 			String ct, c;
-
 			ArrayList<String> spellCheckIndex = spellcheck ? new ArrayList<String>() : null;
 
 			int count = 0;
 			IndexReader reader = null;
-			Searcher searcher = null;
+			IndexSearcher searcher = null;
+
 			try {
 				outer: for (int i = 0; i < files.length; i++) {
 					if (removeCorrupt(files[i]))
 						continue;
+
 					String strFile = files[i].toString();
 					SearchIndex si = indexes.get(files[i].getName());
 
 					if (si == null)
 						continue;
+
 					ct = si.getCategoryTree();
 					c = engine.getListUtil().toList(si.getCategories(), ",");
 
@@ -594,11 +595,12 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					if (!matchCategories(si.getCategories(), category))
 						continue;
 
-					Document doc;
 					String id = files[i].getName();
 					data.addRecordsSearched(_countDocs(strFile));
 
 					reader = _getReader(id, false);
+					searcher = new IndexSearcher(reader);
+
 					if (query == null && "*".equals(criteria)) {
 						int len = reader.numDocs();
 						for (int y = 0; y < len; y++) {
@@ -606,7 +608,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 								continue;
 							if (maxrows > -1 && list.size() >= maxrows)
 								break outer;
-							doc = reader.document(y);
+
+							Document doc = reader.document(y);
 							list.add(createSearchResulItem(highlighter, analyzer, doc, id, 1, ct, c,
 									aa.getContextPassages(), aa.getContextBytes()));
 						}
@@ -614,73 +617,66 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 						if (spellcheck)
 							spellCheckIndex.add(id);
 
-						searcher = new IndexSearcher(reader);
-						TopDocs topDocs = searcher.search(query, Integer.MAX_VALUE);
+						// search with TopDocs
+						TopDocs topDocs = searcher.search(query, maxrows > -1 ? startrow + maxrows : Integer.MAX_VALUE);
 						ScoreDoc[] scoreDocs = topDocs.scoreDocs;
 						int len = scoreDocs.length;
 
 						for (int y = 0; y < len; y++) {
-							if (startrow > ++count) {
+							if (startrow > ++count)
 								continue;
-							}
-							if (maxrows > -1 && list.size() >= maxrows) {
+							if (maxrows > -1 && list.size() >= maxrows)
 								break outer;
-							}
 
-							list.add(createSearchResulItem(highlighter, analyzer, searcher.doc(scoreDocs[y].doc), id,
-									scoreDocs[y].score, ct, c, aa.getContextPassages(), aa.getContextBytes()));
+							Document doc = searcher.doc(scoreDocs[y].doc);
+							list.add(createSearchResulItem(highlighter, analyzer, doc, id, scoreDocs[y].score, ct, c,
+									aa.getContextPassages(), aa.getContextBytes()));
 						}
-
 					}
-
 				}
 			} finally {
 				close(reader);
-				close(searcher);
 			}
 
 			// spellcheck
-			// SearchData data=ThreadLocalSearchData.get();
-			if (spellcheck && data != null) {
-				if (data.getSuggestionMax() >= list.size()) {
+			if (spellcheck && data != null && data.getSuggestionMax() >= list.size()) {
+				Map suggestions = data.getSuggestion();
+				Iterator it = spellCheckIndex.iterator();
+				String id;
+				Literal[] literals = queryParser.getLiteralSearchedTerms();
+				String[] strLiterals = queryParser.getStringSearchedTerms();
+				boolean setSuggestionQuery = false;
 
-					Map suggestions = data.getSuggestion();
-					Iterator it = spellCheckIndex.iterator();
-					String id;
-					Literal[] literals = queryParser.getLiteralSearchedTerms();
-					String[] strLiterals = queryParser.getStringSearchedTerms();
-					boolean setSuggestionQuery = false;
-					while (it.hasNext()) {
-						id = (String) it.next();
-						// add to set to remove duplicate values
-						SuggestionItemImpl si;
-						SpellChecker sc = getSpellChecker(id);
-						for (int i = 0; i < strLiterals.length; i++) {
-							String[] arr = sc.suggestSimilar(strLiterals[i], 1000);
-							if (arr.length > 0) {
-								literals[i].set("<suggestion>" + arr[0] + "</suggestion>");
-								setSuggestionQuery = true;
+				while (it.hasNext()) {
+					id = (String) it.next();
+					SuggestionItemImpl si;
+					SpellChecker sc = getSpellChecker(id);
 
-								si = (SuggestionItemImpl) suggestions.get(strLiterals[i]);
-								if (si == null)
-									suggestions.put(strLiterals[i], new SuggestionItemImpl(arr));
-								else
-									si.add(arr);
-							}
+					for (int i = 0; i < strLiterals.length; i++) {
+						String[] arr = sc.suggestSimilar(strLiterals[i], 1000);
+						if (arr.length > 0) {
+							literals[i].set("<suggestion>" + arr[0] + "</suggestion>");
+							setSuggestionQuery = true;
+
+							si = (SuggestionItemImpl) suggestions.get(strLiterals[i]);
+							if (si == null)
+								suggestions.put(strLiterals[i], new SuggestionItemImpl(arr));
+							else
+								si.add(arr);
 						}
 					}
-					if (setSuggestionQuery)
-						data.setSuggestionQuery(op.toString());
 				}
+				if (setSuggestionQuery)
+					data.setSuggestionQuery(op.toString());
 			}
 
 			return list.toArray(new SearchResulItem[list.size()]);
+
 		} catch (SearchException e) {
 			throw e;
 		} catch (Exception e) {
 			throw new SearchException(e);
 		}
-
 	}
 
 	private SpellChecker getSpellChecker(String id) throws IOException, PageException {
@@ -796,11 +792,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	}
 
 	private IndexWriterConfig _getConfig() throws SearchException {
-		if (config == null) {
-			config = new IndexWriterConfig(CommonUtil.VERSION, SearchUtil.getAnalyzer(getLanguage()));
-
-		}
-		return config;
+		return new IndexWriterConfig(CommonUtil.VERSION, SearchUtil.getAnalyzer(getLanguage()));
 	}
 
 	/**
@@ -815,15 +807,14 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	 */
 	private IndexWriter _getWriter(String id, boolean create) throws SearchException, IOException, PageException {
 		Resource dir = _getIndexDirectory(id, true);
-
+		IndexWriterConfig config = _getConfig();
 		// Set create/append mode
 		if (create) {
 			config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
 		} else {
 			config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
 		}
-
-		return new IndexWriter(FSDirectory.open(engine.getCastUtil().toFile(dir)), _getConfig());
+		return new IndexWriter(FSDirectory.open(engine.getCastUtil().toFile(dir)), config);
 	}
 
 	private IndexReader _getReader(String id, boolean absolute) throws IOException, PageException {
@@ -833,12 +824,12 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	private IndexReader _getReader(File file) throws IOException {
 		// Check if index exists using FSDirectory
 		FSDirectory dir = FSDirectory.open(file);
-		if (!IndexReader.indexExists(dir)) {
+		if (!DirectoryReader.indexExists(dir)) {
 			throw new IOException("there is no index in [" + file + "]");
 		}
 
-		// Open reader using FSDirectory
-		return IndexReader.open(dir);
+		// Open reader using DirectoryReader
+		return DirectoryReader.open(dir);
 	}
 
 	private File _getFile(String id, boolean absolute) throws IOException, PageException {
