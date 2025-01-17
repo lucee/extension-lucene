@@ -78,6 +78,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	private Log log;
 
 	private final CFMLEngine engine;
+
+	private IndexWriterConfig config;
 	private static final SerializableObject token = new SerializableObject();
 
 	/**
@@ -213,7 +215,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			Dictionary dictionary = new LuceneDictionary(reader, "contents");
 
 			SpellChecker spellChecker = new SpellChecker(spellDir);
-			spellChecker.indexDictionary(dictionary);
+			spellChecker.indexDictionary(dictionary, _getConfig(), true);
 
 		} catch (Exception e) {
 			throw new SearchException(e);
@@ -793,6 +795,14 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		return indexDir;
 	}
 
+	private IndexWriterConfig _getConfig() throws SearchException {
+		if (config == null) {
+			config = new IndexWriterConfig(CommonUtil.VERSION, SearchUtil.getAnalyzer(getLanguage()));
+
+		}
+		return config;
+	}
+
 	/**
 	 * get writer to id
 	 * 
@@ -805,7 +815,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	 */
 	private IndexWriter _getWriter(String id, boolean create) throws SearchException, IOException, PageException {
 		Resource dir = _getIndexDirectory(id, true);
-		IndexWriterConfig config = new IndexWriterConfig(CommonUtil.VERSION, SearchUtil.getAnalyzer(getLanguage()));
 
 		// Set create/append mode
 		if (create) {
@@ -814,7 +823,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
 		}
 
-		return new IndexWriter(FSDirectory.open(engine.getCastUtil().toFile(dir)), config);
+		return new IndexWriter(FSDirectory.open(engine.getCastUtil().toFile(dir)), _getConfig());
 	}
 
 	private IndexReader _getReader(String id, boolean absolute) throws IOException, PageException {

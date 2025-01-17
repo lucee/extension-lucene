@@ -7,6 +7,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.highlight.Highlighter;
+import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.highlight.QueryScorer;
 import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
 
@@ -15,7 +16,7 @@ import lucee.loader.util.Util;
 public class _Highlight {
 
 	public static String createContextSummary(Object highlighter, Analyzer analyzer, String text, int maxNumFragments,
-			String defaultValue) throws IOException {
+			String defaultValue) throws IOException, InvalidTokenOffsetsException {
 		// try {
 		if (!(highlighter instanceof Highlighter) || analyzer == null || Util.isEmpty(text))
 			return defaultValue;
