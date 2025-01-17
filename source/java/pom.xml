@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.lucee</groupId>
   <artifactId>lucene-search</artifactId>
-  <version>3.0.0.1-ALPHA</version>
+  <version>3.0.0.3-ALPHA</version>
 
     <name>Lucene Search</name>
     <description>Lucene Search implementation for Lucee</description>
@@ -208,38 +208,28 @@
 <!-- Lucene Dependencies -->
 <dependency>
     <groupId>org.apache.lucene</groupId>
-    <artifactId>lucene-core</artifactId>
-    <version>4.10.4</version>
-</dependency>
-<dependency>
-    <groupId>org.apache.lucene</groupId>
-    <artifactId>lucene-analyzers-common</artifactId>
-    <version>4.10.4</version>
+    <artifactId>lucene-analyzers</artifactId>
+    <version>3.6.2</version>
 </dependency>
 <dependency>
     <groupId>org.apache.lucene</groupId>
     <artifactId>lucene-highlighter</artifactId>
-    <version>4.10.4</version>
+    <version>3.6.2</version>
 </dependency>
 <dependency>
     <groupId>org.apache.lucene</groupId>
     <artifactId>lucene-misc</artifactId>
-    <version>4.10.4</version>
+    <version>3.6.2</version>
 </dependency>
 <dependency>
     <groupId>org.apache.lucene</groupId>
-    <artifactId>lucene-queries</artifactId>
-    <version>4.10.4</version>
+    <artifactId>lucene-core</artifactId>
+    <version>3.6.2</version>
 </dependency>
 <dependency>
     <groupId>org.apache.lucene</groupId>
-    <artifactId>lucene-queryparser</artifactId>
-    <version>4.10.4</version>
-</dependency>
-<dependency>
-    <groupId>org.apache.lucene</groupId>
-    <artifactId>lucene-suggest</artifactId>
-    <version>4.10.4</version>
+    <artifactId>lucene-snowball</artifactId>
+    <version>2.2.0</version>
 </dependency>
 <dependency>
     <groupId>org.apache.lucene</groupId>

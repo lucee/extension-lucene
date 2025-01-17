@@ -18,6 +18,7 @@ import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.WildcardQuery;
+import org.lucee.extension.search.lucene.util.CommonUtil;
 
 /**
  * @deprecated no longer in use The simple query is the default query type and
@@ -60,8 +61,9 @@ public final class Simple {
 	 * 
 	 * @param criteria
 	 * @return matching Query
+	 * @throws IOException
 	 */
-	public Query parse(String criteria) {
+	public Query parse(String criteria) throws IOException {
 		Query qry = (Query) results.get(criteria);
 		if (qry != null)
 			return qry;
@@ -92,7 +94,7 @@ public final class Simple {
 		return qry;
 	}
 
-	private Query orOp(ParserString ps) {
+	private Query orOp(ParserString ps) throws IOException {
 		Query query = andOp(ps);
 		ps.removeSpace();
 
@@ -109,7 +111,7 @@ public final class Simple {
 		return query;
 	}
 
-	private Query andOp(ParserString ps) {
+	private Query andOp(ParserString ps) throws IOException {
 		Query query = notOp(ps);
 		ps.removeSpace();
 
@@ -124,7 +126,7 @@ public final class Simple {
 		return query;
 	}
 
-	private Query notOp(ParserString ps) {
+	private Query notOp(ParserString ps) throws IOException {
 		// NOT
 		if (ps.isValidIndex() && ps.forwardIfCurrent(NOT)) {
 			ps.removeSpace();
@@ -135,7 +137,7 @@ public final class Simple {
 		return clip(ps);
 	}
 
-	private Query clip(ParserString ps) {
+	private Query clip(ParserString ps) throws IOException {
 		// ()
 		if (ps.isValidIndex() && ps.forwardIfCurrent('(')) {
 			Query query = orOp(ps);
@@ -147,7 +149,7 @@ public final class Simple {
 		return literal(ps);
 	}
 
-	private Query literal(ParserString ps) {
+	private Query literal(ParserString ps) throws IOException {
 		_Term term = term(ps);
 		ps.removeSpace();
 		while (ps.isValidIndex() && !ps.isCurrent(',') && !ps.isCurrent(OR) && !ps.isCurrent(AND)
@@ -203,7 +205,7 @@ public final class Simple {
 			type = TYPE_PHRASE;
 		}
 
-		private Query toQuery() {
+		private Query toQuery() throws IOException {
 			if (type == TYPE_FUZZY)
 				return toFuzzyQuery();
 			else if (type == TYPE_WILDCARD)
@@ -225,33 +227,31 @@ public final class Simple {
 			return new PrefixQuery(new Term(FIELD, c.substring(0, c.length() - 1)));
 		}
 
-		private PhraseQuery toPhraseQuery() {
-			TokenStream source = null;
+		private PhraseQuery toPhraseQuery() throws IOException {
+			TokenStream source = analyzer.tokenStream(FIELD, new StringReader(content));
 			List<String> terms = new ArrayList<>();
 
 			try {
-				source = analyzer.tokenStream(FIELD, new StringReader(content));
-				CharTermAttribute termAtt = source.addAttribute(CharTermAttribute.class);
-
-				// Reset the stream - required in 4.x
+				// Reset the stream - required in Lucene 3.x
 				source.reset();
+
+				// Use AttributeSource instead of Token
+				CharTermAttribute termAtt = source.addAttribute(CharTermAttribute.class);
 
 				// Collect terms
 				while (source.incrementToken()) {
 					terms.add(termAtt.toString());
 				}
 
+				// End the stream
 				source.end();
 
-			} catch (IOException e) {
-				// Consider logging or wrapping in a RuntimeException if needed
 			} finally {
-				if (source != null) {
-					try {
-						source.close();
-					} catch (IOException e) {
-						// ignore
-					}
+				CommonUtil.closeSilently(source);
+				try {
+					source.close();
+				} catch (IOException e) {
+					// ignore
 				}
 			}
 
