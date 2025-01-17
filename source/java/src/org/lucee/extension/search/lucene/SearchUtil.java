@@ -6,7 +6,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
 import org.apache.lucene.analysis.cjk.CJKAnalyzer;
-import org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer;
 import org.apache.lucene.analysis.cz.CzechAnalyzer;
 import org.apache.lucene.analysis.da.DanishAnalyzer;
 import org.apache.lucene.analysis.de.GermanAnalyzer;
@@ -63,8 +62,6 @@ public final class SearchUtil {
 			analyzer = new SpanishAnalyzer();
 		else if (language.equals("brazilian"))
 			analyzer = new BrazilianAnalyzer();
-		else if (language.equals("chinese"))
-			analyzer = new SmartChineseAnalyzer();
 		else if (language.startsWith("czech"))
 			analyzer = new CzechAnalyzer();
 		else if (language.equals("greek"))
