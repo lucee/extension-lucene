@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
 import org.apache.lucene.analysis.cjk.CJKAnalyzer;
-import org.apache.lucene.analysis.cn.ChineseAnalyzer;
+import org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer;
 import org.apache.lucene.analysis.cz.CzechAnalyzer;
 import org.apache.lucene.analysis.da.DanishAnalyzer;
 import org.apache.lucene.analysis.de.GermanAnalyzer;
@@ -25,7 +25,6 @@ import org.apache.lucene.analysis.standard.StandardTokenizer;
 import org.apache.lucene.analysis.sv.SwedishAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.lucene.analysis.tr.TurkishAnalyzer;
-import org.lucee.extension.search.lucene.util.CommonUtil;
 
 import lucee.runtime.search.SearchException;
 
@@ -47,49 +46,49 @@ public final class SearchUtil {
 		StandardTokenizer st = null;
 
 		if (language.equals("english"))
-			analyzer = new StandardAnalyzer(CommonUtil.VERSION);
+			analyzer = new StandardAnalyzer();
 		else if (language.equals("german"))
-			analyzer = new GermanAnalyzer(CommonUtil.VERSION);
+			analyzer = new GermanAnalyzer();
 		else if (language.equals("russian"))
-			analyzer = new RussianAnalyzer(CommonUtil.VERSION);
+			analyzer = new RussianAnalyzer();
 		else if (language.equals("dutch"))
-			analyzer = new DutchAnalyzer(CommonUtil.VERSION);
+			analyzer = new DutchAnalyzer();
 		else if (language.equals("french"))
-			analyzer = new FrenchAnalyzer(CommonUtil.VERSION);
+			analyzer = new FrenchAnalyzer();
 		else if (language.equals("norwegian"))
-			analyzer = new NorwegianAnalyzer(CommonUtil.VERSION);
+			analyzer = new NorwegianAnalyzer();
 		else if (language.equals("portuguese"))
-			analyzer = new PortugueseAnalyzer(CommonUtil.VERSION);
+			analyzer = new PortugueseAnalyzer();
 		else if (language.equals("spanish"))
-			analyzer = new SpanishAnalyzer(CommonUtil.VERSION);
+			analyzer = new SpanishAnalyzer();
 		else if (language.equals("brazilian"))
-			analyzer = new BrazilianAnalyzer(CommonUtil.VERSION);
+			analyzer = new BrazilianAnalyzer();
 		else if (language.equals("chinese"))
-			analyzer = new ChineseAnalyzer();
+			analyzer = new SmartChineseAnalyzer();
 		else if (language.startsWith("czech"))
-			analyzer = new CzechAnalyzer(CommonUtil.VERSION);
+			analyzer = new CzechAnalyzer();
 		else if (language.equals("greek"))
-			analyzer = new GreekAnalyzer(CommonUtil.VERSION);
+			analyzer = new GreekAnalyzer();
 		else if (language.equals("thai"))
-			analyzer = new ThaiAnalyzer(CommonUtil.VERSION);
+			analyzer = new ThaiAnalyzer();
 		else if (language.equals("japanese"))
-			analyzer = new CJKAnalyzer(CommonUtil.VERSION);
+			analyzer = new CJKAnalyzer();
 		else if (language.equals("korean"))
-			analyzer = new CJKAnalyzer(CommonUtil.VERSION);
+			analyzer = new CJKAnalyzer();
 		else if (language.equals("italian"))
-			analyzer = new ItalianAnalyzer(CommonUtil.VERSION);
+			analyzer = new ItalianAnalyzer();
 		else if (language.equals("danish"))
-			analyzer = new DanishAnalyzer(CommonUtil.VERSION);
+			analyzer = new DanishAnalyzer();
 		else if (language.equals("norwegian"))
-			analyzer = new NorwegianAnalyzer(CommonUtil.VERSION);
+			analyzer = new NorwegianAnalyzer();
 		else if (language.equals("finnish"))
-			analyzer = new FinnishAnalyzer(CommonUtil.VERSION);
+			analyzer = new FinnishAnalyzer();
 		else if (language.equals("swedish"))
-			analyzer = new SwedishAnalyzer(CommonUtil.VERSION);
+			analyzer = new SwedishAnalyzer();
 		else if (language.equals("hungarian"))
-			analyzer = new HungarianAnalyzer(CommonUtil.VERSION);
+			analyzer = new HungarianAnalyzer();
 		else if (language.equals("turkish"))
-			analyzer = new TurkishAnalyzer(CommonUtil.VERSION);
+			analyzer = new TurkishAnalyzer();
 
 		else {// TODO add more
 			throw new SearchException("No Language Analyzer for Lanuage " + language + " found");

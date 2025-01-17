@@ -3,6 +3,7 @@ package org.lucee.extension.search.lucene;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,7 +39,6 @@ import org.lucee.extension.search.lucene.highlight.Highlight;
 import org.lucee.extension.search.lucene.net.WebCrawler;
 import org.lucee.extension.search.lucene.query.Literal;
 import org.lucee.extension.search.lucene.query.Op;
-import org.lucee.extension.search.lucene.util.CommonUtil;
 import org.lucee.extension.search.lucene.util.SerializableObject;
 
 import lucee.commons.io.log.Log;
@@ -211,8 +211,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 		Resource dir = _createSpellDirectory(id);
 		try {
-			File spellFile = engine.getCastUtil().toFile(dir);
-			spellDir = FSDirectory.open(spellFile);
+			Path spellPath = engine.getCastUtil().toFile(dir).toPath();
+			spellDir = FSDirectory.open(spellPath);
 			reader = _getReader(id, false);
 			Dictionary dictionary = new LuceneDictionary(reader, "contents");
 
@@ -235,7 +235,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 		Resource dir = _createSpellDirectory(id);
 		try {
-			spellDir = FSDirectory.open(engine.getCastUtil().toFile(dir));
+			spellDir = FSDirectory.open(engine.getCastUtil().toFile(dir).toPath());
 			SpellChecker spellChecker = new SpellChecker(spellDir);
 
 			reader = _getReader(id, false);
@@ -557,7 +557,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				else
 					criteria = op.toString();
 
-				query = new QueryParser(CommonUtil.VERSION, "contents", analyzer).parse(criteria);
+				query = new QueryParser("contents", analyzer).parse(criteria);
 				highlighter = Highlight.createHighlighter(query, aa.getContextHighlightBegin(),
 						aa.getContextHighlightEnd());
 			}
@@ -680,7 +680,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	}
 
 	private SpellChecker getSpellChecker(String id) throws IOException, PageException {
-		FSDirectory siDir = FSDirectory.open(engine.getCastUtil().toFile(_getSpellDirectory(id)));
+		FSDirectory siDir = FSDirectory.open(engine.getCastUtil().toFile(_getSpellDirectory(id)).toPath());
 		SpellChecker spellChecker = new SpellChecker(siDir);
 		return spellChecker;
 	}
@@ -792,7 +792,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	}
 
 	private IndexWriterConfig _getConfig() throws SearchException {
-		return new IndexWriterConfig(CommonUtil.VERSION, SearchUtil.getAnalyzer(getLanguage()));
+		return new IndexWriterConfig(SearchUtil.getAnalyzer(getLanguage()));
 	}
 
 	/**
@@ -814,18 +814,18 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		} else {
 			config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
 		}
-		return new IndexWriter(FSDirectory.open(engine.getCastUtil().toFile(dir)), config);
+		return new IndexWriter(FSDirectory.open(engine.getCastUtil().toFile(dir).toPath()), config);
 	}
 
 	private IndexReader _getReader(String id, boolean absolute) throws IOException, PageException {
-		return _getReader(_getFile(id, absolute));
+		return _getReader(_getFile(id, absolute).toPath());
 	}
 
-	private IndexReader _getReader(File file) throws IOException {
+	private IndexReader _getReader(Path path) throws IOException {
 		// Check if index exists using FSDirectory
-		FSDirectory dir = FSDirectory.open(file);
+		FSDirectory dir = FSDirectory.open(path);
 		if (!DirectoryReader.indexExists(dir)) {
-			throw new IOException("there is no index in [" + file + "]");
+			throw new IOException("there is no index in [" + path + "]");
 		}
 
 		// Open reader using DirectoryReader
@@ -984,9 +984,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		private Resource dir;
 
 		public ResourceIndexWriter(Resource dir, Analyzer analyzer, boolean create) throws IOException, PageException {
-			super(FSDirectory.open(CFMLEngineFactory.getInstance().getCastUtil().toFile(dir)),
-					new IndexWriterConfig(CommonUtil.VERSION, analyzer)
-							.setOpenMode(create ? OpenMode.CREATE : OpenMode.CREATE_OR_APPEND));
+			super(FSDirectory.open(CFMLEngineFactory.getInstance().getCastUtil().toFile(dir).toPath()),
+					new IndexWriterConfig(analyzer).setOpenMode(create ? OpenMode.CREATE : OpenMode.CREATE_OR_APPEND));
 			this.dir = dir;
 			dir.getResourceProvider().lock(dir);
 		}
