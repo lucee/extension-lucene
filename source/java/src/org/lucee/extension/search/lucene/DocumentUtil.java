@@ -126,10 +126,9 @@ public final class DocumentUtil {
 		Document doc = null;
 		if (ext != null) {
 			ext = ext.toLowerCase();
-			// String mimeType=new MimetypesFileTypeMap().getContentType(f);
 			// HTML
-			if (ext.equals("cfm") || ext.equals("htm") || ext.equals("html") || ext.equals("cfm") || ext.equals("cfml")
-					|| ext.equals("php") || ext.equals("asp") || ext.equals("aspx")) {
+			if (ext.equals("cfm") || ext.equals("htm") || ext.equals("html") || ext.equals("cfml") || ext.equals("php")
+					|| ext.equals("asp") || ext.equals("aspx")) {
 				doc = HTMLDocument.getDocument(file, charset);
 			}
 			// PDF
@@ -146,8 +145,9 @@ public final class DocumentUtil {
 			String c = ct.getCharset();
 			if (c != null)
 				charset = c;
-			// String type=ResourceUtil.getMimeType(file,"");
+
 			if (type == null) {
+				// No-op
 			}
 			// HTML
 			else if (type.equals("text/html")) {
@@ -162,9 +162,11 @@ public final class DocumentUtil {
 				doc = WordDocument.getDocument(file);
 			}
 		}
+
 		if (doc == null)
 			doc = FileDocument.getDocument(file, charset);
 
+		// Add additional metadata fields
 		String strPath = file.getPath().replace('\\', '/');
 		String strName = strPath.substring(strPath.lastIndexOf('/'));
 

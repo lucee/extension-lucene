@@ -19,18 +19,24 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
+import org.apache.lucene.index.PostingsEnum;
+import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.highlight.Highlighter;
+import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.spell.Dictionary;
 import org.apache.lucene.search.spell.LuceneDictionary;
 import org.apache.lucene.search.spell.SpellChecker;
 import org.apache.lucene.store.FSDirectory;
-import org.lucee.extension.search.AddionalAttrs;
+import org.apache.lucene.util.BytesRef;
 import org.lucee.extension.search.IndexResultImpl;
 import org.lucee.extension.search.SearchCollectionSupport;
+import org.lucee.extension.search.SearchDataImpl;
 import org.lucee.extension.search.SearchEngineSupport;
 import org.lucee.extension.search.SearchResulItemImpl;
 import org.lucee.extension.search.SuggestionItemImpl;
@@ -53,9 +59,11 @@ import lucee.runtime.search.SearchData;
 import lucee.runtime.search.SearchException;
 import lucee.runtime.search.SearchIndex;
 import lucee.runtime.search.SearchResulItem;
+import lucee.runtime.search.SuggestionItem;
 import lucee.runtime.type.QueryColumn;
 import lucee.runtime.type.Struct;
 import lucee.runtime.type.dt.DateTime;
+import lucee.runtime.util.Cast;
 
 /**
  * 
@@ -95,6 +103,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		engine = CFMLEngineFactory.getInstance();
 		this.spellcheck = spellcheck;
 		collectionDir = getPath().getRealResource(toIdentityVariableName(getName()));
+		System.err.println("----- <init>" + spellcheck + " ----");
 
 		log = searchEngine.getConfig().getLog("search");
 	}
@@ -536,6 +545,14 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	@Override
 	public SearchResulItem[] _search(SearchData data, String criteria, String language, short type, String categoryTree,
 			String[] category) throws SearchException {
+		return _search(data, criteria, language, type, 1, -1, categoryTree, category);
+	}
+
+	@Override
+	public SearchResulItem[] _search(SearchData data, String criteria, String language, short type, int startrow,
+			int maxrow, String categoryTree, String[] category) throws SearchException {
+		System.err.println("----- search: " + criteria + " ----");
+
 		try {
 			if (type != SEARCH_TYPE_SIMPLE)
 				throw new SearchException("search type explicit not supported");
@@ -543,13 +560,31 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			Analyzer analyzer = SearchUtil.getAnalyzer(language);
 			Query query = null;
 			Op op = null;
-			Object highlighter = null;
-			org.lucee.extension.search.lucene.query.QueryParser queryParser = new org.lucee.extension.search.lucene.query.QueryParser();
-			AddionalAttrs aa = AddionalAttrs.getAddionlAttrs();
-			aa.setHasRowHandling(true);
-			int startrow = aa.getStartrow();
-			int maxrows = aa.getMaxrows();
 
+			org.lucee.extension.search.lucene.query.QueryParser queryParser = new org.lucee.extension.search.lucene.query.QueryParser();
+
+			// addional attributes
+			int contextBytes = 0;
+			int contextPassages = 300;
+			int fragmentSize = 150;
+			String contextHighlightBegin = "<b>";
+			String contextHighlightEnd = "</b>";
+			System.err.print("SearchDataImpl:" + data.getClass().getName());
+			if (data instanceof SearchDataImpl) {
+				System.err.println("!!!");
+				Cast cast = engine.getCastUtil();
+				((SearchDataImpl) data).dumpAddionalAttributes();
+				Map<String, Object> attrs = ((SearchDataImpl) data).getAddionalAttributes();
+				System.err.println("!!! " + (attrs != null));
+				if (attrs != null) {
+					contextBytes = cast.toIntValue(attrs.get("contextBytes"), contextBytes);
+					contextPassages = cast.toIntValue(attrs.get("contextPassages"), contextPassages);
+					fragmentSize = cast.toIntValue(attrs.get("fragmentSize"), fragmentSize);
+					contextHighlightBegin = cast.toString(attrs.get("contextHighlightBegin"), contextHighlightBegin);
+					contextHighlightEnd = cast.toString(attrs.get("contextHighlightEnd"), contextHighlightEnd);
+				}
+			}
+			Highlighter highlighter = null;
 			if (!criteria.equals("*")) {
 				op = queryParser.parseOp(criteria);
 				if (op == null)
@@ -558,15 +593,13 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					criteria = op.toString();
 
 				query = new QueryParser("contents", analyzer).parse(criteria);
-				highlighter = Highlight.createHighlighter(query, aa.getContextHighlightBegin(),
-						aa.getContextHighlightEnd());
+				highlighter = Highlight.createHighlighter(query, contextHighlightBegin, contextHighlightEnd,
+						fragmentSize);
 			}
-
 			Resource[] files = _getIndexDirectories();
 
 			if (files == null)
 				return new SearchResulItem[0];
-
 			ArrayList<SearchResulItem> list = new ArrayList<SearchResulItem>();
 			String ct, c;
 			ArrayList<String> spellCheckIndex = spellcheck ? new ArrayList<String>() : null;
@@ -574,7 +607,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			int count = 0;
 			IndexReader reader = null;
 			IndexSearcher searcher = null;
-
 			try {
 				outer: for (int i = 0; i < files.length; i++) {
 					if (removeCorrupt(files[i]))
@@ -582,7 +614,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 					String strFile = files[i].toString();
 					SearchIndex si = indexes.get(files[i].getName());
-
 					if (si == null)
 						continue;
 
@@ -600,37 +631,65 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 					reader = _getReader(id, false);
 					searcher = new IndexSearcher(reader);
-
 					if (query == null && "*".equals(criteria)) {
 						int len = reader.numDocs();
 						for (int y = 0; y < len; y++) {
 							if (startrow > ++count)
 								continue;
-							if (maxrows > -1 && list.size() >= maxrows)
+							if (maxrow > -1 && list.size() >= maxrow)
 								break outer;
-
 							Document doc = reader.document(y);
-							list.add(createSearchResulItem(highlighter, analyzer, doc, id, 1, ct, c,
-									aa.getContextPassages(), aa.getContextBytes()));
+							list.add(createSearchResulItem(highlighter, analyzer, doc, id, 1, ct, c, contextPassages,
+									contextBytes));
 						}
 					} else {
 						if (spellcheck)
 							spellCheckIndex.add(id);
 
 						// search with TopDocs
-						TopDocs topDocs = searcher.search(query, maxrows > -1 ? startrow + maxrows : Integer.MAX_VALUE);
+						TopDocs topDocs = searcher.search(query, maxrow > -1 ? startrow + maxrow : Integer.MAX_VALUE);
 						ScoreDoc[] scoreDocs = topDocs.scoreDocs;
 						int len = scoreDocs.length;
 
 						for (int y = 0; y < len; y++) {
 							if (startrow > ++count)
 								continue;
-							if (maxrows > -1 && list.size() >= maxrows)
+							if (maxrow > -1 && list.size() >= maxrow)
 								break outer;
-
 							Document doc = searcher.doc(scoreDocs[y].doc);
+							Terms terms = reader.getTermVector(scoreDocs[y].doc, "contents");
+
+							if (terms != null) {
+								TermsEnum termsEnum = terms.iterator();
+								BytesRef term = null;
+								System.err.println("xxxxxxxxxxxxxxxxxxxxxxxxxx");
+								while ((term = termsEnum.next()) != null) {
+									String termText = term.utf8ToString();
+
+									// Get the postings with positions and offsets
+									PostingsEnum postings = termsEnum.postings(null,
+											PostingsEnum.POSITIONS | PostingsEnum.OFFSETS);
+
+									// Move to first doc
+									if (postings.nextDoc() != PostingsEnum.NO_MORE_DOCS) {
+										// Get frequency of term in document
+										int freq = postings.freq();
+										// For each occurrence
+										for (int j = 0; j < freq; j++) {
+											// Get position
+											int pos = postings.nextPosition();
+
+											// Now safe to get offsets
+											int startOffset = postings.startOffset();
+											int endOffset = postings.endOffset();
+										}
+									}
+								}
+							}
+							// doc.add(new StringField("custom1", sb.toString(), Field.Store.YES));
+
 							list.add(createSearchResulItem(highlighter, analyzer, doc, id, scoreDocs[y].score, ct, c,
-									aa.getContextPassages(), aa.getContextBytes()));
+									contextPassages, contextBytes));
 						}
 					}
 				}
@@ -640,15 +699,15 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 			// spellcheck
 			if (spellcheck && data != null && data.getSuggestionMax() >= list.size()) {
-				Map suggestions = data.getSuggestion();
-				Iterator it = spellCheckIndex.iterator();
+				Map<String, SuggestionItem> suggestions = data.getSuggestion();
+				Iterator<String> it = spellCheckIndex.iterator();
 				String id;
 				Literal[] literals = queryParser.getLiteralSearchedTerms();
 				String[] strLiterals = queryParser.getStringSearchedTerms();
 				boolean setSuggestionQuery = false;
 
 				while (it.hasNext()) {
-					id = (String) it.next();
+					id = it.next();
 					SuggestionItemImpl si;
 					SpellChecker sc = getSpellChecker(id);
 
@@ -657,7 +716,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 						if (arr.length > 0) {
 							literals[i].set("<suggestion>" + arr[0] + "</suggestion>");
 							setSuggestionQuery = true;
-
 							si = (SuggestionItemImpl) suggestions.get(strLiterals[i]);
 							if (si == null)
 								suggestions.put(strLiterals[i], new SuggestionItemImpl(arr));
@@ -666,8 +724,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 						}
 					}
 				}
-				if (setSuggestionQuery)
+				if (setSuggestionQuery) {
 					data.setSuggestionQuery(op.toString());
+				}
 			}
 
 			return list.toArray(new SearchResulItem[list.size()]);
@@ -693,13 +752,17 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		return false;
 	}
 
-	private static SearchResulItem createSearchResulItem(Object highlighter, Analyzer a, Document doc, String name,
-			float score, String ct, String c, int maxNumFragments, int maxLength) {
+	private static SearchResulItem createSearchResulItem(Highlighter highlighter, Analyzer a, Document doc, String name,
+			float score, String ct, String c, int maxNumFragments, int maxLength)
+			throws IOException, InvalidTokenOffsetsException {
+		if (maxLength < 1000)
+			maxLength = 1000;
+
 		String contextSummary = "";
-		if (maxNumFragments > 0)
-			contextSummary = Highlight.createContextSummary(highlighter, a, doc.get("contents"), maxNumFragments,
-					maxLength, doc.get("summary"));
+
 		String summary = doc.get("summary");
+		contextSummary = Highlight.createContextSummary(highlighter, a, doc.get("contents"), maxNumFragments, maxLength,
+				summary);
 
 		return new SearchResulItemImpl(name, doc.get("title"), score, doc.get("key"), doc.get("url"), summary,
 				contextSummary, ct, c, doc.get("custom1"), doc.get("custom2"), doc.get("custom3"), doc.get("custom4"),

@@ -4,7 +4,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.ar.ArabicAnalyzer;
+import org.apache.lucene.analysis.bg.BulgarianAnalyzer;
+import org.apache.lucene.analysis.bn.BengaliAnalyzer;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
+import org.apache.lucene.analysis.ca.CatalanAnalyzer;
 import org.apache.lucene.analysis.cjk.CJKAnalyzer;
 import org.apache.lucene.analysis.cz.CzechAnalyzer;
 import org.apache.lucene.analysis.da.DanishAnalyzer;
@@ -44,46 +48,52 @@ public final class SearchUtil {
 			return analyzer;
 		StandardTokenizer st = null;
 
-		if (language.equals("english"))
-			analyzer = new StandardAnalyzer();
-		else if (language.equals("german"))
-			analyzer = new GermanAnalyzer();
-		else if (language.equals("russian"))
-			analyzer = new RussianAnalyzer();
-		else if (language.equals("dutch"))
-			analyzer = new DutchAnalyzer();
-		else if (language.equals("french"))
-			analyzer = new FrenchAnalyzer();
-		else if (language.equals("norwegian"))
-			analyzer = new NorwegianAnalyzer();
-		else if (language.equals("portuguese"))
-			analyzer = new PortugueseAnalyzer();
-		else if (language.equals("spanish"))
-			analyzer = new SpanishAnalyzer();
+		if (language.equals("arabic"))
+			analyzer = new ArabicAnalyzer();
+		else if (language.equals("bulgarian"))
+			analyzer = new BulgarianAnalyzer();
+		else if (language.equals("bengali"))
+			analyzer = new BengaliAnalyzer();
 		else if (language.equals("brazilian"))
 			analyzer = new BrazilianAnalyzer();
-		else if (language.startsWith("czech"))
+		else if (language.equals("catalan"))
+			analyzer = new CatalanAnalyzer();
+		else if (language.equals("czech"))
 			analyzer = new CzechAnalyzer();
+		else if (language.equals("danish"))
+			analyzer = new DanishAnalyzer();
+		else if (language.equals("dutch"))
+			analyzer = new DutchAnalyzer();
+		else if (language.equals("english"))
+			analyzer = new StandardAnalyzer();
+		else if (language.equals("finnish"))
+			analyzer = new FinnishAnalyzer();
+		else if (language.equals("french"))
+			analyzer = new FrenchAnalyzer();
+		else if (language.equals("german"))
+			analyzer = new GermanAnalyzer();
 		else if (language.equals("greek"))
 			analyzer = new GreekAnalyzer();
-		else if (language.equals("thai"))
-			analyzer = new ThaiAnalyzer();
+		else if (language.equals("hungarian"))
+			analyzer = new HungarianAnalyzer();
+		else if (language.equals("italian"))
+			analyzer = new ItalianAnalyzer();
 		else if (language.equals("japanese"))
 			analyzer = new CJKAnalyzer();
 		else if (language.equals("korean"))
 			analyzer = new CJKAnalyzer();
-		else if (language.equals("italian"))
-			analyzer = new ItalianAnalyzer();
-		else if (language.equals("danish"))
-			analyzer = new DanishAnalyzer();
 		else if (language.equals("norwegian"))
 			analyzer = new NorwegianAnalyzer();
-		else if (language.equals("finnish"))
-			analyzer = new FinnishAnalyzer();
+		else if (language.equals("portuguese"))
+			analyzer = new PortugueseAnalyzer();
+		else if (language.equals("russian"))
+			analyzer = new RussianAnalyzer();
+		else if (language.equals("spanish"))
+			analyzer = new SpanishAnalyzer();
 		else if (language.equals("swedish"))
 			analyzer = new SwedishAnalyzer();
-		else if (language.equals("hungarian"))
-			analyzer = new HungarianAnalyzer();
+		else if (language.equals("thai"))
+			analyzer = new ThaiAnalyzer();
 		else if (language.equals("turkish"))
 			analyzer = new TurkishAnalyzer();
 

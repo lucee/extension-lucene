@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.io.Reader;
 
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
+import org.apache.lucene.index.IndexOptions;
 
 import lucee.commons.io.res.Resource;
 import lucee.loader.engine.CFMLEngine;
@@ -46,7 +49,20 @@ public final class FileDocument {
 		String content = e.getIOUtil().toString(res, e.getCastUtil().toCharset(charset));
 		FieldUtil.setRaw(doc, content);
 		// doc.add(FieldUtil.UnIndexed("raw", content));
-		doc.add(FieldUtil.Text("contents", content.toLowerCase()));
+
+		// Create a custom FieldType for the "contents" field
+		FieldType fieldType = new FieldType();
+		fieldType.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS);
+		fieldType.setTokenized(true);
+		fieldType.setStored(true);
+		// Enables term vectors
+		fieldType.setStoreTermVectors(true);
+		fieldType.setStoreTermVectorPositions(true);
+		fieldType.setStoreTermVectorOffsets(true);
+		fieldType.freeze();
+
+		doc.add(new Field("contents", content, fieldType));
+		// doc.add(new TextField("contents", content.toLowerCase(), Field.Store.YES));
 		doc.add(FieldUtil.UnIndexed("summary", WordDocument.max(content, SUMMERY_SIZE, "")));
 		return doc;
 	}

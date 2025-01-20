@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.lucee</groupId>
   <artifactId>lucene-search</artifactId>
-  <version>3.0.0.21-ALPHA</version>
+  <version>3.0.0.60-ALPHA</version>
 
     <name>Lucene Search</name>
     <description>Lucene Search implementation for Lucee</description>
@@ -241,7 +241,11 @@
     <artifactId>lucene-suggest</artifactId>
     <version>9.12.1</version>
 </dependency>
-
+<dependency>
+    <groupId>org.apache.lucene</groupId>
+    <artifactId>lucene-memory</artifactId>
+    <version>9.12.1</version>
+</dependency>
 
 <!-- Other Dependencies -->
 <dependency>
