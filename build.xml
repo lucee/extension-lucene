@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project default="clean" basedir="." name="formtag-extension">
+<project default="clean" basedir="." name="lucene-extension">
 	<description>
-        Build Form Extension
+        Build Lucene Extension
     </description>
     <!-- set global properties for this build -->
   
@@ -34,15 +34,7 @@
   </target>
 
 
-  <target name="copy" depends="init" description="copy source file to temp" >
-    <!-- copy the source -->
-    <copy todir="${temp}">
-      <fileset dir="${src}">
-        <include name="**/*.java"/>
-      </fileset>
-    </copy>
-
-
+  <target name="createManifest" depends="init" description="create MANIFEST.MF file" >
     <tstamp>
      <format property="NOW" pattern="yyyy-MM-dd HH:mm:ss" />
     </tstamp>
@@ -56,21 +48,14 @@ description: "${description}"
 lucee-core-version: "${luceeCoreVersion}"
 release-type: ${releaseType}
 start-bundles: false
-search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bundleversion}'}]"
+search: "[{'class':'${class}','maven':'${mvnGroupId}:${mvnArtifactId}:${mvnVersion}'}]"
 </echo>
   </target>
   
 
 
-  <target name="compile" depends="copy"
-        description="compile the source " >
-    <!-- Compile ACF-Infinspan source -->
-    <javac srcdir="${temp}" target="1.7" destdir="${build}" debug="true" debuglevel="lines,vars,source">
-      <classpath refid="classpath" />
-    </javac>
-  </target>
 
-  <target name="dist" depends="compile"
+  <target name="dist" depends="createManifest"
         description="generate the distribution" >
     
  
@@ -86,15 +71,9 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
     </jar>
 
 
-    <!-- copy the context necessary
-    <copy todir="${dist}/extension/webcontexts">
-      <fileset dir="${context}">
-        <include name="**/*.*"/>
-      </fileset>
-    </copy> -->
 
-    <!-- copy the jars necessary -->
-    <copy todir="${dist}/extension/jars">
+    <!-- copy the jars necessary
+    <copy todir="${dist}/extension/maven">
       <fileset dir="${lib}">
         <include name="**/*.jar"/>
         <exclude name="**/javax.servlet.jar"/>
@@ -104,7 +83,7 @@ search: "[{'class':'${class}','bundleName':'${bundlename}','bundleVersion':'${bu
 
 
       </fileset>
-    </copy>
+    </copy> -->
 
     <!-- copy the logo -->
     <copy todir="${dist}/extension/META-INF">

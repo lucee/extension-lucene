@@ -14,8 +14,11 @@
         <maven.compiler.target>11</maven.compiler.target>
         <id>EFDEB172-F52E-4D84-9CD1A1F561B3DFC8</id>
         <bundlename>lucene.search.extension</bundlename>
+        <mvnGroupId>org.lucee</mvnGroupId>
+        <mvnArtifactId>lucene-search</mvnArtifactId>
+        <mvnVersion>3.0.0.60-ALPHA</mvnVersion>
         <filename>lucene-search-extension</filename>
-        <luceeCoreVersion>5.0.0.157</luceeCoreVersion>
+        <luceeCoreVersion>6.2.0.286-SNAPSHOT</luceeCoreVersion>
         <releaseType>server</releaseType>
         <label>Lucene Search Extension</label>
         <camelname>Lucene</camelname>
