@@ -32,6 +32,7 @@ import lucee.runtime.type.Collection.Key;
 import lucee.runtime.type.Query;
 import lucee.runtime.type.QueryColumn;
 import lucee.runtime.type.dt.DateTime;
+import lucee.runtime.util.Creation;
 import lucee.runtime.util.HTTPUtil;
 
 /**
@@ -646,6 +647,26 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 			int to = (!hasRowHandling && maxrow > -1 && len + records.length > maxrow) ? maxrow - len : records.length;
 			qry.addRow(to);
 
+			Creation creator = engine.getCreationUtil();
+
+			Key _title = creator.createKey("title");
+			Key _custom1 = creator.createKey("custom1");
+			Key _custom2 = creator.createKey("custom2");
+			Key _custom3 = creator.createKey("custom3");
+			Key _custom4 = creator.createKey("custom4");
+			Key _categoryTree = creator.createKey("categoryTree");
+			Key _category = creator.createKey("category");
+			Key _type = creator.createKey("type");
+			Key _author = creator.createKey("author");
+			Key _size = creator.createKey("size");
+			Key _summary = creator.createKey("summary");
+			Key _context = creator.createKey("context");
+			Key _score = creator.createKey("score");
+			Key _key = creator.createKey("key");
+			Key _url = creator.createKey("url");
+			Key _collection = creator.createKey("collection");
+			Key _rank = creator.createKey("rank");
+
 			String title;
 			String custom1;
 			String custom2;
@@ -667,24 +688,25 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 				custom4 = record.getCustom4();
 				url = record.getUrl();
 
-				qry.setAt("title", row, title);
-				qry.setAt("custom1", row, custom1);
-				qry.setAt("custom2", row, custom2);
-				qry.setAt("custom3", row, custom3);
-				qry.setAt("custom4", row, custom4);
-				qry.setAt("categoryTree", row, record.getCategoryTree());
-				qry.setAt("category", row, record.getCategory());
-				qry.setAt("type", row, record.getMimeType());
-				qry.setAt("author", row, record.getAuthor());
-				qry.setAt("size", row, record.getSize());
+				qry.setAt(_title, row, title);
+				qry.setAt(_custom1, row, custom1);
+				qry.setAt(_custom2, row, custom2);
+				qry.setAt(_custom3, row, custom3);
+				qry.setAt(_custom4, row, custom4);
+				qry.setAt(_categoryTree, row, record.getCategoryTree());
+				qry.setAt(_category, row, record.getCategory());
+				qry.setAt(_type, row, record.getMimeType());
+				qry.setAt(_author, row, record.getAuthor());
+				qry.setAt(_size, row, record.getSize());
 
-				qry.setAt("summary", row, record.getSummary());
-				qry.setAt("context", row, record.getContextSummary());
-				qry.setAt("score", row, new Float(record.getScore()));
-				qry.setAt("key", row, record.getKey());
-				qry.setAt("url", row, url);
-				qry.setAt("collection", row, getName());
-				qry.setAt("rank", row, Double.valueOf(row));
+				qry.setAt(_summary, row, record.getSummary());
+				qry.setAt(_context, row, ((SearchResulItemImpl) record).getContext());
+				// qry.setAt("context", row, record.getContextSummary());
+				qry.setAt(_score, row, Double.valueOf(record.getScore()));
+				qry.setAt(_key, row, record.getKey());
+				qry.setAt(_url, row, url);
+				qry.setAt(_collection, row, getName());
+				qry.setAt(_rank, row, Double.valueOf(row));
 				String rootPath, file;
 				String urlPath;
 				if (si != null) {
@@ -694,7 +716,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 						rootPath = rootPath.replace(FILE_ANTI_SEPERATOR, FILE_SEPERATOR);
 						file = record.getKey();
 						file = file.replace(FILE_ANTI_SEPERATOR, FILE_SEPERATOR);
-						qry.setAt("url", row, toURL(si.getUrlpath(),
+						qry.setAt(_url, row, toURL(si.getUrlpath(),
 								engine.getStringUtil().replace(file, rootPath, "", true, false)));
 
 						break;
@@ -708,28 +730,28 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 						if (Util.isEmpty(urlPath))
 							urlPath = rootPath;
 						file = record.getKey();
-						qry.setAt("url", row,
+						qry.setAt(_url, row,
 								toURL(urlPath, engine.getStringUtil().replace(file, rootPath, "", true, false)));
 
 						break;
 					case SearchIndex.TYPE_CUSTOM:
-						qry.setAt("url", row, url);
+						qry.setAt(_url, row, url);
 						break;
 					default:
-						qry.setAt("url", row, toURL(si.getUrlpath(), url));
+						qry.setAt(_url, row, toURL(si.getUrlpath(), url));
 						break;
 					}
 
 					if (Util.isEmpty(title))
-						qry.setAt("title", row, si.getTitle());
+						qry.setAt(_title, row, si.getTitle());
 					if (Util.isEmpty(custom1))
-						qry.setAt("custom1", row, si.getCustom1());
+						qry.setAt(_custom1, row, si.getCustom1());
 					if (Util.isEmpty(custom2))
-						qry.setAt("custom2", row, si.getCustom2());
+						qry.setAt(_custom2, row, si.getCustom2());
 					if (Util.isEmpty(custom3))
-						qry.setAt("custom3", row, si.getCustom3());
+						qry.setAt(_custom3, row, si.getCustom3());
 					if (Util.isEmpty(custom4))
-						qry.setAt("custom4", row, si.getCustom4());
+						qry.setAt(_custom4, row, si.getCustom4());
 
 				}
 			}

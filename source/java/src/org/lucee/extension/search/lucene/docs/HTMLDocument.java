@@ -1,96 +1,69 @@
 package org.lucee.extension.search.lucene.docs;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 
-import org.apache.lucene.document.DateTools;
 import org.apache.lucene.document.Document;
 import org.lucee.extension.search.lucene.html.HTMLParser;
+import org.xml.sax.SAXException;
 
 import lucee.commons.io.res.Resource;
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;
+import lucee.runtime.exp.PageException;
 
 /** A utility for making Lucene Documents for HTML documents. */
 
 public final class HTMLDocument {
-	private static final char FILE_SEPARATOR = System.getProperty("file.separator").charAt(0);
 
-	public static String uid(Resource f) {
-		return f.getPath().replace(FILE_SEPARATOR, '\u0000') + '\u0000'
-				+ DateTools.timeToString(f.lastModified(), DateTools.Resolution.MILLISECOND);
-	}
-
-	public static String uid2url(String uid) {
-		String url = uid.replace('\u0000', '/'); // replace nulls with slashes
-		return url.substring(0, url.lastIndexOf('/')); // remove date from end
-	}
-
-	public static Document getDocument(Resource res, String charset) {
-		Document doc = new Document();
-		doc.add(FieldUtil.Text("uid", uid(res), false));
+	public static Document getDocument(Resource res, String charset) throws PageException, IOException {
 
 		HTMLParser parser = new HTMLParser();
 		try {
 			parser.parse(res, charset);
-		} catch (Throwable t) {
-			if (t instanceof ThreadDeath)
-				throw (ThreadDeath) t;
-			return doc;
+		} catch (SAXException e) {
+			throw CFMLEngineFactory.getInstance().getCastUtil().toPageException(e);
 		}
-		addContent(doc, parser);
-		return doc;
+
+		return DocumentSupport.add(createContent(parser), res);
 	}
 
-	public static Document getDocument(StringBuffer content, Reader reader) {
+	public static Document getDocument(StringBuffer content, Reader reader, boolean closeReader)
+			throws PageException, IOException {
 		CFMLEngine e = CFMLEngineFactory.getInstance();
-		Document doc = new Document();
 
-		HTMLParser parser = new HTMLParser();
 		try {
+			HTMLParser parser = new HTMLParser();
 			String str = e.getIOUtil().toString(reader);
 			if (content != null)
 				content.append(str);
+
+			parser.parse(new StringReader(str));
+			Document doc = createContent(parser);
+
 			doc.add(FieldUtil.UnIndexed("size", e.getCastUtil().toString(str.length())));
-			StringReader sr = new StringReader(str);
-			parser.parse(sr);
-		} catch (Throwable t) {
-			if (t instanceof ThreadDeath)
-				throw (ThreadDeath) t;
 			return doc;
+
+		} catch (SAXException ex) {
+			throw e.getCastUtil().toPageException(ex);
+		} finally {
+			if (closeReader)
+				Util.closeEL(reader);
 		}
 
-		addContent(doc, parser);
-		return doc;
 	}
 
-	private static void addContent(Document doc, HTMLParser parser) {
+	private static Document createContent(HTMLParser parser) throws PageException, IOException {
 
-		FieldUtil.setMimeType(doc, "text/html");
-		// doc.add(FieldUtil.UnIndexed("mime-type", "text/html"));
-
-		String content = parser.getContent();
+		Document doc = DocumentSupport.createDocument(parser.getSummary(), parser.getContent(), "text/html");
 
 		FieldUtil.setTitle(doc, parser.getTitle());
-
-		String summary = parser.getSummary();
-		if (Util.isEmpty(summary)) {
-			summary = (content.length() <= 200) ? content : content.substring(0, 200);
-			FieldUtil.setSummary(doc, summary, false);
-		} else {
-			FieldUtil.setSummary(doc, summary, true);
-		}
-		FieldUtil.setRaw(doc, content);
-		FieldUtil.setContent(doc, content);
-
-		// doc.add(FieldUtil.UnIndexed("charset",
-		// StringUtil.valueOf(parser.getCharset())));
 
 		if (parser.hasKeywords()) {
 			FieldUtil.setKeywords(doc, parser.getKeywords());
 		}
-
 		if (parser.hasAuthor()) {
 			FieldUtil.setAuthor(doc, parser.getAuthor());
 		}
@@ -106,7 +79,7 @@ public final class HTMLDocument {
 		if (parser.hasCustom4()) {
 			FieldUtil.setCustom(doc, parser.getCustom4(), 4);
 		}
-
+		return doc;
 	}
 
 	private HTMLDocument() {

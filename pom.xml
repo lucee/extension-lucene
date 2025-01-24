@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.lucee</groupId>
     <artifactId>lucene-search-extension</artifactId>
-    <version>2.4.2.5-SNAPSHOT</version>
+    <version>3.0.0.89-ALPHA</version>
     <packaging>pom</packaging>
     <name>Lucene Search Engine</name>
 
@@ -18,7 +18,7 @@
         <mvnArtifactId>lucene-search</mvnArtifactId>
         <mvnVersion>3.0.0.60-ALPHA</mvnVersion>
         <filename>lucene-search-extension</filename>
-        <luceeCoreVersion>6.2.0.286-SNAPSHOT</luceeCoreVersion>
+        <luceeCoreVersion>6.2.0.286</luceeCoreVersion>
         <releaseType>server</releaseType>
         <label>Lucene Search Extension</label>
         <camelname>Lucene</camelname>
@@ -72,6 +72,9 @@
     <url>https://github.com/lucee/extension-lucene</url>
 
     <profiles>
+
+
+
         <profile>
             <id>release-sign-artifacts</id>
             <activation>
@@ -144,6 +147,7 @@
                                     <property name="description" value="${project.description}"/>
                                     <property name="class" value="${class}"/>
                                     <property name="camelname" value="${camelname}"/>
+                                    <property name="maven.goal" value="${goal}"/>
                                 </ant>
                                 <condition property="isSnapshot" value="true" else="false">
                                     <matches string="${project.version}" pattern=".*-SNAPSHOT"/>

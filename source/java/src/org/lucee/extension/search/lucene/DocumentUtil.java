@@ -55,44 +55,24 @@ public final class DocumentUtil {
 		}
 		// HTML
 		else if (ct.getMimeType().indexOf("text/html") != -1) {
-			Reader r = null;
-			try {
-				r = io.getReader(method.getContentAsStream(), e.getCastUtil().toCharset(charset));
-				doc = HTMLDocument.getDocument(content, r);
-			} finally {
-				io.closeSilent(r);
-			}
+			Reader r = io.getReader(method.getContentAsStream(), e.getCastUtil().toCharset(charset));
+			doc = HTMLDocument.getDocument(content, r, true);
 		}
 		// PDF
 		else if (ct.getMimeType().indexOf("application/pdf") != -1) {
-			InputStream is = null;
-			try {
-				is = io.toBufferedInputStream(method.getContentAsStream());
-				doc = PDFDocument.getDocument(content, is);
-			} finally {
-				io.closeSilent(is);
-			}
+			InputStream is = io.toBufferedInputStream(method.getContentAsStream());
+			doc = PDFDocument.getDocument(content, is, true);
 		}
 		// DOC
 		else if (ct.getMimeType().equals("application/msword")) {
-			InputStream is = null;
-			try {
-				is = io.toBufferedInputStream(method.getContentAsStream());
-				doc = WordDocument.getDocument(content, is);
-			} finally {
-				io.closeSilent(is);
-			}
-
+			InputStream is = io.toBufferedInputStream(method.getContentAsStream());
+			doc = WordDocument.getDocument(content, is, true);
 		}
 		// Plain
 		else if (ct.getMimeType().indexOf("text/plain") != -1) {
-			Reader r = null;
-			try {
-				r = io.toBufferedReader(io.getReader(method.getContentAsStream(), e.getCastUtil().toCharset(charset)));
-				doc = FileDocument.getDocument(content, r);
-			} finally {
-				io.closeSilent(r);
-			}
+			Reader r = io
+					.toBufferedReader(io.getReader(method.getContentAsStream(), e.getCastUtil().toCharset(charset)));
+			doc = FileDocument.getDocument(content, r, true);
 		}
 
 		if (doc != null) {
@@ -101,8 +81,6 @@ public final class DocumentUtil {
 			doc.add(FieldUtil.UnIndexed("url", strPath));
 			doc.add(FieldUtil.UnIndexed("key", strPath));
 			doc.add(FieldUtil.UnIndexed("path", strPath));
-			// doc.add(FieldUtil.UnIndexed("size", Caster.toString(file.length())));
-			// doc.add(FieldUtil.Keyword("modified",DateField.timeToString(file.lastModified())));
 		}
 
 		return doc;

@@ -24,7 +24,8 @@ public class SearchResulItemImpl implements SearchResulItem {
 	private String mimeType;
 	private String author;
 	private String size;
-	private String contextSummary;
+	private Object context;
+	private String contents;
 
 	/**
 	 * @param id
@@ -42,8 +43,8 @@ public class SearchResulItemImpl implements SearchResulItem {
 	 * @param size
 	 */
 	public SearchResulItemImpl(String id, String title, float score, String key, String url, String summary,
-			String contextSummary, String categoryTree, String category, String custom1, String custom2, String custom3,
-			String custom4, String mimeType, String author, String size) {
+			Object context, String contents, String categoryTree, String category, String custom1, String custom2,
+			String custom3, String custom4, String mimeType, String author, String size) {
 		this.id = id;
 		this.title = title;
 		this.score = score;
@@ -51,7 +52,8 @@ public class SearchResulItemImpl implements SearchResulItem {
 		this.key = key;
 		this.url = url;
 		this.summary = summary;
-		this.contextSummary = contextSummary;
+		this.context = context;
+		this.contents = contents;
 
 		this.categoryTree = categoryTree;
 		this.category = category;
@@ -77,6 +79,14 @@ public class SearchResulItemImpl implements SearchResulItem {
 	@Override
 	public String getSummary() {
 		return summary;
+	}
+
+	public String getContents() {
+		return contents;
+	}
+
+	public Object getContext() {
+		return context;
 	}
 
 	@Override
@@ -178,6 +188,6 @@ public class SearchResulItemImpl implements SearchResulItem {
 	 */
 	@Override
 	public String getContextSummary() {
-		return contextSummary;
+		return context.toString();
 	}
 }

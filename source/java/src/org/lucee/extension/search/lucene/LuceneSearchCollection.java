@@ -27,7 +27,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.highlight.Highlighter;
+import org.apache.lucene.search.highlight.Formatter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.spell.Dictionary;
 import org.apache.lucene.search.spell.LuceneDictionary;
@@ -41,7 +41,9 @@ import org.lucee.extension.search.SearchEngineSupport;
 import org.lucee.extension.search.SearchResulItemImpl;
 import org.lucee.extension.search.SuggestionItemImpl;
 import org.lucee.extension.search.lucene.docs.CustomDocument;
-import org.lucee.extension.search.lucene.highlight.Highlight;
+import org.lucee.extension.search.lucene.highlight.HTMLFormatterWithScore;
+import org.lucee.extension.search.lucene.highlight.TextCollection;
+import org.lucee.extension.search.lucene.highlight.TextHandler;
 import org.lucee.extension.search.lucene.net.WebCrawler;
 import org.lucee.extension.search.lucene.query.Literal;
 import org.lucee.extension.search.lucene.query.Op;
@@ -53,6 +55,7 @@ import lucee.commons.io.res.filter.ResourceFilter;
 import lucee.commons.io.res.filter.ResourceNameFilter;
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;
+import lucee.loader.util.Util;
 import lucee.runtime.exp.PageException;
 import lucee.runtime.search.IndexResult;
 import lucee.runtime.search.SearchData;
@@ -120,6 +123,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			if (!collectionDir.exists())
 				collectionDir.createDirectory(true);
 		} catch (IOException e) {
+			throw new SearchException(e);
 		}
 	}
 
@@ -564,11 +568,12 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			org.lucee.extension.search.lucene.query.QueryParser queryParser = new org.lucee.extension.search.lucene.query.QueryParser();
 
 			// addional attributes
-			int contextBytes = 0;
-			int contextPassages = 300;
-			int fragmentSize = 150;
-			String contextHighlightBegin = "<b>";
-			String contextHighlightEnd = "</b>";
+			int contextBytes = 1000;
+			int contextPassages = 3;
+			int contextPassageLength = 150;
+			String contextHighlightBegin = HTMLFormatterWithScore.DEFAULT_PRE_TAG;
+			String contextHighlightEnd = HTMLFormatterWithScore.DEFAULT_POST_TAG;
+			String tmp;
 			System.err.print("SearchDataImpl:" + data.getClass().getName());
 			if (data instanceof SearchDataImpl) {
 				System.err.println("!!!");
@@ -579,12 +584,25 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				if (attrs != null) {
 					contextBytes = cast.toIntValue(attrs.get("contextBytes"), contextBytes);
 					contextPassages = cast.toIntValue(attrs.get("contextPassages"), contextPassages);
-					fragmentSize = cast.toIntValue(attrs.get("fragmentSize"), fragmentSize);
-					contextHighlightBegin = cast.toString(attrs.get("contextHighlightBegin"), contextHighlightBegin);
-					contextHighlightEnd = cast.toString(attrs.get("contextHighlightEnd"), contextHighlightEnd);
+					contextPassageLength = cast.toIntValue(attrs.get("contextPassageLength"), contextPassageLength);
+
+					tmp = cast.toString(attrs.get("contextHighlightBegin"), null);
+					if (!Util.isEmpty(tmp, true))
+						contextHighlightBegin = tmp;
+					tmp = cast.toString(attrs.get("contextHighlightEnd"), null);
+					if (!Util.isEmpty(tmp, true))
+						contextHighlightEnd = tmp;
 				}
 			}
-			Highlighter highlighter = null;
+
+			System.err.println("------- attributes -------");
+			System.err.println("contextBytes: " + contextBytes);
+			System.err.println("contextPassages: " + contextPassages);
+			System.err.println("contextPassageLength: " + contextPassageLength);
+			System.err.println("contextHighlightBegin: " + contextHighlightBegin);
+			System.err.println("contextHighlightEnd: " + contextHighlightEnd);
+
+			HTMLFormatterWithScore formatter = null;
 			if (!criteria.equals("*")) {
 				op = queryParser.parseOp(criteria);
 				if (op == null)
@@ -593,8 +611,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					criteria = op.toString();
 
 				query = new QueryParser("contents", analyzer).parse(criteria);
-				highlighter = Highlight.createHighlighter(query, contextHighlightBegin, contextHighlightEnd,
-						fragmentSize);
+				formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
+
 			}
 			Resource[] files = _getIndexDirectories();
 
@@ -639,8 +657,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 							if (maxrow > -1 && list.size() >= maxrow)
 								break outer;
 							Document doc = reader.document(y);
-							list.add(createSearchResulItem(highlighter, analyzer, doc, id, 1, ct, c, contextPassages,
-									contextBytes));
+							list.add(createSearchResulItem(query, formatter, doc, id, 1, ct, c, contextPassages,
+									contextPassageLength, contextBytes));
 						}
 					} else {
 						if (spellcheck)
@@ -688,8 +706,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 							}
 							// doc.add(new StringField("custom1", sb.toString(), Field.Store.YES));
 
-							list.add(createSearchResulItem(highlighter, analyzer, doc, id, scoreDocs[y].score, ct, c,
-									contextPassages, contextBytes));
+							list.add(createSearchResulItem(query, formatter, doc, id, scoreDocs[y].score, ct, c,
+									contextPassages, contextPassageLength, contextBytes));
 						}
 					}
 				}
@@ -752,21 +770,32 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		return false;
 	}
 
-	private static SearchResulItem createSearchResulItem(Highlighter highlighter, Analyzer a, Document doc, String name,
-			float score, String ct, String c, int maxNumFragments, int maxLength)
+	private static SearchResulItem createSearchResulItem(Query query, Formatter formatter, Document doc, String name,
+			float score, String ct, String c, int contextPassages, int contextPassageLength, int contextBytes)
 			throws IOException, InvalidTokenOffsetsException {
-		if (maxLength < 1000)
-			maxLength = 1000;
-
-		String contextSummary = "";
 
 		String summary = doc.get("summary");
-		contextSummary = Highlight.createContextSummary(highlighter, a, doc.get("contents"), maxNumFragments, maxLength,
-				summary);
+		String contents = doc.get("contents");
 
+		Object contextSummary;
+		if (contextBytes > 0 && contextPassages > 0) {
+
+			contextSummary = new TextCollection(contents,
+					TextHandler.findBestTexts(query, formatter, contents, contextPassages, contextPassageLength),
+					"...\n", contextBytes);
+
+			System.err.println("------- createSearchResulItem -------");
+			System.err.println("contents.length: " + contents.length());
+			System.err.println("contextBytes: " + contextBytes);
+			System.err.println("contextPassages: " + contextPassages);
+			System.err.println("contextPassageLength: " + contextPassageLength);
+
+		} else {
+			contextSummary = "";
+		}
 		return new SearchResulItemImpl(name, doc.get("title"), score, doc.get("key"), doc.get("url"), summary,
-				contextSummary, ct, c, doc.get("custom1"), doc.get("custom2"), doc.get("custom3"), doc.get("custom4"),
-				doc.get("mime-type"), doc.get("author"), doc.get("size"));
+				contextSummary, contents, ct, c, doc.get("custom1"), doc.get("custom2"), doc.get("custom3"),
+				doc.get("custom4"), doc.get("mime-type"), doc.get("author"), doc.get("size"));
 
 	}
 
@@ -821,6 +850,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					_index(writer, res, url);
 					doccount++;
 				} catch (Exception e) {
+					error(e);
 				}
 			}
 		}
@@ -1094,6 +1124,15 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				max = nbr;
 		}
 		return max;
+	}
+
+	private void error(Exception e) {
+		e.printStackTrace();
+		if (log == null) {
+			e.printStackTrace();
+			return;
+		}
+		log.log(Log.LEVEL_ERROR, "Collection:" + getName(), e);
 	}
 
 	private void info(String doc) {

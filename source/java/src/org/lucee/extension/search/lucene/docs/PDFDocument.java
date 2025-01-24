@@ -14,78 +14,10 @@ import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import org.apache.pdfbox.text.PDFTextStripper;
 
 import lucee.commons.io.res.Resource;
-import lucee.loader.engine.CFMLEngine;
-import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;
-import lucee.runtime.util.IO;
+import lucee.runtime.exp.PageException;
 
-/**
- * This class is used to create a document for the lucene search engine. This
- * should easily plug into the IndexHTML or IndexFiles that comes with the
- * lucene project. This class will populate the following fields.
- * <table>
- * <tr>
- * <td>Lucene Field Name</td>
- * <td>Description</td>
- * </tr>
- * <tr>
- * <td>path</td>
- * <td>File system path if loaded from a file</td>
- * </tr>
- * <tr>
- * <td>url</td>
- * <td>URL to PDF document</td>
- * </tr>
- * <tr>
- * <td>contents</td>
- * <td>Entire contents of PDF document, indexed but not stored</td>
- * </tr>
- * <tr>
- * <td>summary</td>
- * <td>First 500 characters of content</td>
- * </tr>
- * <tr>
- * <td>modified</td>
- * <td>The modified date/time according to the url or path</td>
- * </tr>
- * <tr>
- * <td>uid</td>
- * <td>A unique identifier for the Lucene document.</td>
- * </tr>
- * <tr>
- * <td>CreationDate</td>
- * <td>From PDF meta-data if available</td>
- * </tr>
- * <tr>
- * <td>Creator</td>
- * <td>From PDF meta-data if available</td>
- * </tr>
- * <tr>
- * <td>Keywords</td>
- * <td>From PDF meta-data if available</td>
- * </tr>
- * <tr>
- * <td>ModificationDate</td>
- * <td>From PDF meta-data if available</td>
- * </tr>
- * <tr>
- * <td>Producer</td>
- * <td>From PDF meta-data if available</td>
- * </tr>
- * <tr>
- * <td>Subject</td>
- * <td>From PDF meta-data if available</td>
- * </tr>
- * <tr>
- * <td>Trapped</td>
- * <td>From PDF meta-data if available</td>
- * </tr>
- * </table>
- *
- */
 public final class PDFDocument {
-	private static final char FILE_SEPARATOR = System.getProperty("file.separator").charAt(0);
-	private static final int SUMMERY_SIZE = 200;
 
 	/**
 	 * private constructor because there are only static methods.
@@ -100,13 +32,13 @@ public final class PDFDocument {
 	 * @param is
 	 *            The stream to read the PDF from.
 	 * @return The lucene document.
+	 * @throws PageException
 	 * @throws IOException
 	 *             If there is an error parsing or indexing the document.
 	 */
-	public static Document getDocument(StringBuffer content, InputStream is) {
-		Document document = new Document();
-		addContent(content, document, is, false);
-		return document;
+	public static Document getDocument(StringBuffer content, InputStream is, boolean closeStream)
+			throws PageException, IOException {
+		return addContent(content, is, closeStream);
 	}
 
 	/**
@@ -115,39 +47,14 @@ public final class PDFDocument {
 	 * @param res
 	 *            The file to get the document for.
 	 * @return The lucene document.
+	 * @throws PageException
 	 * @throws IOException
 	 *             If there is an error parsing or indexing the document.
 	 */
-	public static Document getDocument(Resource res) {
-		CFMLEngine en = CFMLEngineFactory.getInstance();
-		IO io = en.getIOUtil();
-
-		Document document = new Document();
-		FieldUtil.setMimeType(document, "application/pdf");
-		// document.add(FieldUtil.UnIndexed("mime-type", "application/pdf"));
-		document.add(FieldUtil.UnIndexed("path", res.getPath()));
-
-		String uid = res.getPath().replace(FILE_SEPARATOR, '\u0000') + "\u0000"
-				+ DateTools.timeToString(res.lastModified(), DateTools.Resolution.MILLISECOND);
-		document.add(FieldUtil.Text("uid", uid, false));
-
-		// Add the uid as a field, so that index can be incrementally maintained.
-		// This field is not stored with document, it is indexed, but it is not
-		// tokenized prior to indexing.
-		// document.add(new Field("uid", uid, Field.Store.NO,Field.Index.UN_TOKENIZED));
-		// document.add(new Field("uid", uid, false, true, false));
-
-		addContent(null, document, res);
-		return document;
-	}
-
-	private static void addContent(StringBuffer content, Document document, Resource res) {
+	public static Document getDocument(Resource res) throws PageException, IOException {
+		System.err.println("pdf: " + res);
 		if (!(res instanceof File)) {
-			try {
-				addContent(content, document, res.getInputStream(), true);
-			} catch (IOException e) {
-			}
-			return;
+			return DocumentSupport.add(addContent(null, res.getInputStream(), true), res);
 		}
 
 		org.apache.pdfbox.pdmodel.PDDocument pdfDocument = null;
@@ -159,10 +66,8 @@ public final class PDFDocument {
 				// Just try using the default password and move on
 				pdfDocument = Loader.loadPDF((File) res, "");
 			}
-			_addContent(content, document, pdfDocument);
+			return DocumentSupport.add(_addContent(null, pdfDocument), res);
 
-		} catch (IOException ioe) {
-			// TODO Log
 		} finally {
 			if (pdfDocument != null) {
 				try {
@@ -174,7 +79,8 @@ public final class PDFDocument {
 		}
 	}
 
-	private static void addContent(StringBuffer content, Document document, InputStream is, boolean closeStream) {
+	private static Document addContent(StringBuffer content, InputStream is, boolean closeStream)
+			throws PageException, IOException {
 		org.apache.pdfbox.pdmodel.PDDocument pdfDocument = null;
 		try {
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -187,9 +93,8 @@ public final class PDFDocument {
 				// Just try using the default password and move on
 				pdfDocument = Loader.loadPDF(barr, "");
 			}
-			_addContent(content, document, pdfDocument);
-		} catch (IOException ioe) {
-			// TODO Log
+			return _addContent(content, pdfDocument);
+
 		} finally {
 			if (pdfDocument != null) {
 				try {
@@ -201,25 +106,30 @@ public final class PDFDocument {
 		}
 	}
 
-	private static void _addContent(StringBuffer content, Document document,
-			org.apache.pdfbox.pdmodel.PDDocument pdfDocument) throws IOException {
+	private static Document _addContent(StringBuffer content, org.apache.pdfbox.pdmodel.PDDocument pdfDocument)
+			throws IOException, PageException {
 
 		// create a writer where to append the text content.
 		StringWriter writer = new StringWriter();
 		PDFTextStripper stripper = new PDFTextStripper();
 		stripper.writeText(pdfDocument, writer);
 
+		// stripper.setLineSeparator("\n");
+		// stripper.setStartPage(1);
+		// stripper.setEndPage(5);// this mean that it will index the first 5 pages only
+		// String conteddnts = stripper.getText(pdfDocument);
+
 		// Note: the buffer to string operation is costless;
 		// the char array value of the writer buffer and the content string
 		// is shared as long as the buffer content is not modified, which will
 		// not occur here.
 		String contents = writer.getBuffer().toString();
+		System.err.println(contents);
+
 		if (content != null)
 			content.append(contents);
 
-		FieldUtil.setRaw(document, contents);
-		FieldUtil.setContent(document, contents);
-		FieldUtil.setSummary(document, WordDocument.max(contents, SUMMERY_SIZE, ""), false);
+		Document document = DocumentSupport.createDocument(null, contents, "application/pdf");
 
 		PDDocumentInformation info = pdfDocument.getDocumentInformation();
 		if (info.getAuthor() != null) {
@@ -257,6 +167,25 @@ public final class PDFDocument {
 		if (info.getTrapped() != null) {
 			document.add(FieldUtil.Text("Trapped", info.getTrapped()));
 		}
-
+		return document;
 	}
+
+	/*
+	 * private void addToIndex(org.apache.pdfbox.pdmodel.PDDocument pddDocument)
+	 * throws Exception {
+	 * 
+	 * PDFTextStripper textStripper = new PDFTextStripper(); for (int pageNo = 1;
+	 * pageNo <= pddDocument.getNumberOfPages(); pageNo++) {
+	 * textStripper.setStartPage(pageNo); textStripper.setEndPage(pageNo); String
+	 * pageContent = textStripper.getText(pddDocument); //
+	 * System.out.println(pageContent); Document doc = new Document();
+	 * 
+	 * // Add the page number doc.add(new Field("pagenumber",
+	 * Integer.toString(pageNo), Field.Store.YES, Field.Index.ANALYZED));
+	 * doc.add(new Field("content", pageContent, Field.Store.NO,
+	 * Field.Index.ANALYZED)); doc.add(new Field("SOURCE",
+	 * source.unRooted(this.root), Field.Store.YES, Field.Index.ANALYZED));
+	 * documents.add(doc); getIndexWriter().addDocument(doc); } pddDocument.close();
+	 * }
+	 */
 }

@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.lucee</groupId>
   <artifactId>lucene-search</artifactId>
-  <version>3.0.0.60-ALPHA</version>
+  <version>${revision}</version>
 
     <name>Lucene Search</name>
     <description>Lucene Search implementation for Lucee</description>
@@ -36,6 +36,28 @@
         <build>
         <sourceDirectory>src</sourceDirectory>
         <plugins>
+
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <version>3.6.0</version>
+            <executions>
+                <execution>
+                    <id>copy-dependencies</id>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>copy-dependencies</goal>
+                    </goals>
+                    <configuration>
+                        <outputDirectory>${project.build.directory}/dependency</outputDirectory>
+                        <includeScope>compile</includeScope>
+                        <useRepositoryLayout>true</useRepositoryLayout>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+
+
          	
          	<!-- Add source jar generation -->
 <plugin>
@@ -273,6 +295,8 @@
     <artifactId>tm-extractors</artifactId>
     <version>0.4</version>
 </dependency>
+
+
 <dependency>
     <groupId>org.lucee</groupId>
     <artifactId>lucee</artifactId>
