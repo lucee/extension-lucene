@@ -18,7 +18,6 @@ public class TextSplitter {
 	}
 
 	public List<Text> split(String text) {
-
 		int tol = (int) (maxSize * 0.2D);
 		int maxLength = maxSize + tol;
 		int minLength = maxSize - tol;
@@ -69,7 +68,7 @@ public class TextSplitter {
 			}
 		}
 		if (last != null) {
-			if (last.length() < minLength) {
+			if (last.length() < minLength && positions.size() > 0) {
 				Text tmp = positions.get(positions.size() - 1);
 				Text both = Text.merge(tmp, last);
 				if (both.length() > maxLength) {
@@ -127,7 +126,7 @@ public class TextSplitter {
 
 	public static void main(String[] args) {
 		// Sample text with paragraphs
-		final String text = "The red fox is one of nature's most adaptable creatures. In the dense forest, "
+		String text = "The red fox is one of nature's most adaptable creatures. In the dense forest, "
 				+ "a clever fox makes its home beneath an old oak tree! Every evening, this fox emerges "
 				+ "to hunt for mice and rabbits. The local farmers often spot the fox near their chicken coops, "
 				+ "though this particular fox seems more interested in the field mice. Urban areas have their own "
@@ -141,8 +140,16 @@ public class TextSplitter {
 				+ "and excellent hearing make it a superb hunter. Sometimes, a fox can be seen playing with its prey "
 				+ "before making the final catch. The playful nature of the fox has been documented in many studies.";
 
+		text = "# File system - Mappings\n" + "\n" + "We distinguish 3 different mapping types:\n" + "\n"
+				+ "- \"component\" mappings used to map components (similar to a classpath in Java),\n"
+				+ "- \"custom tag\" mappings used to map custom tags\n"
+				+ "- \"regular mappings\" for the rest ([[tag-include]], [[tag-file]] ...).\n" + "\n"
+				+ "* [[cookbook-filesystem-mapping-define-mapping]]\n"
+				+ "* [[cookbook-application-context-set-mapping]]\n" + "* Define a component Mapping (TODO)\n"
+				+ "* Define a custom tag Mapping (TODO) Mapping,Component mapping,Custom tag mapping,Regular mapping,File system ";
+
 		System.out.println(text.length());
-		TextSplitter ps = new TextSplitter(500);
+		TextSplitter ps = new TextSplitter(1000);
 		for (Text s : ps.split(text)) {
 			System.out.println("---- " + s.length() + " ----");
 			System.out.println(s.text);

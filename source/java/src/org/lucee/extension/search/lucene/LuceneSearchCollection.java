@@ -14,6 +14,7 @@ import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.KnnVectorField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
@@ -22,8 +23,13 @@ import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.KnnVectorQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
@@ -41,6 +47,9 @@ import org.lucee.extension.search.SearchEngineSupport;
 import org.lucee.extension.search.SearchResulItemImpl;
 import org.lucee.extension.search.SuggestionItemImpl;
 import org.lucee.extension.search.lucene.docs.CustomDocument;
+import org.lucee.extension.search.lucene.embedding.EmbeddingService;
+import org.lucee.extension.search.lucene.embedding.TfIdfEmbeddingService;
+import org.lucee.extension.search.lucene.embedding.Word2VecEmbeddingService;
 import org.lucee.extension.search.lucene.highlight.HTMLFormatterWithScore;
 import org.lucee.extension.search.lucene.highlight.TextCollection;
 import org.lucee.extension.search.lucene.highlight.TextHandler;
@@ -83,38 +92,40 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 	private static final long serialVersionUID = 3430238280421965781L;
 
+	private static final String TF_IDF = "TF-IDF";
+	private static final String WORD2VEC = "word2vec";
+
 	private Resource collectionDir;
 	private boolean spellcheck;
+	private String embedding;
+	private EmbeddingService embeddingService;
+
 	private Log log;
 
 	private final CFMLEngine engine;
 
 	private static final SerializableObject token = new SerializableObject();
 
-	/**
-	 * @param searchEngine
-	 * @param name
-	 * @param path
-	 * @param language
-	 * @param lastUpdate
-	 * @param created
-	 */
-	public LuceneSearchCollection(SearchEngineSupport searchEngine, String name, Resource path, String language, // int
-																													// count,
+	public LuceneSearchCollection(SearchEngineSupport searchEngine, String name, Resource path, String language,
+			DateTime lastUpdate, DateTime created) {
+		this(searchEngine, name, path, language, lastUpdate, created, true, null);
+	}
+
+	public LuceneSearchCollection(SearchEngineSupport searchEngine, String name, Resource path, String language,
 			DateTime lastUpdate, DateTime created, boolean spellcheck) {
+		this(searchEngine, name, path, language, lastUpdate, created, spellcheck, null);
+	}
+
+	public LuceneSearchCollection(SearchEngineSupport searchEngine, String name, Resource path, String language,
+			DateTime lastUpdate, DateTime created, boolean spellcheck, String embedding) {
 		super(searchEngine, name, path, language, lastUpdate, created);
 		engine = CFMLEngineFactory.getInstance();
 		this.spellcheck = spellcheck;
 		collectionDir = getPath().getRealResource(toIdentityVariableName(getName()));
-		System.err.println("----- <init>" + spellcheck + " ----");
-
+		if (Util.isEmpty(embedding)) {
+			this.embedding = embedding.trim();
+		}
 		log = searchEngine.getConfig().getLog("search");
-	}
-
-	public LuceneSearchCollection(SearchEngineSupport searchEngine, String name, Resource path, String language, // int
-																													// count,
-			DateTime lastUpdate, DateTime created) {
-		this(searchEngine, name, path, language, lastUpdate, created, true);
 	}
 
 	@Override
@@ -380,7 +391,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				writer = _getWriter(id, true);
 				Iterator<Entry<String, Document>> it = docs.entrySet().iterator();
 				while (it.hasNext()) {
-					writer.addDocument(it.next().getValue());
+					writer.addDocument(embed(it.next().getValue()));
 				}
 				optimizeEL(writer);
 
@@ -491,7 +502,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				while (it.hasNext()) {
 					entry = it.next();
 					doc = entry.getValue();
-					writer.addDocument(doc);
+					writer.addDocument(embed(doc));
 				}
 				optimizeEL(writer);
 				// writer.optimize();
@@ -555,7 +566,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	@Override
 	public SearchResulItem[] _search(SearchData data, String criteria, String language, short type, int startrow,
 			int maxrow, String categoryTree, String[] category) throws SearchException {
-		System.err.println("----- search: " + criteria + " ----");
 
 		try {
 			if (type != SEARCH_TYPE_SIMPLE)
@@ -573,6 +583,11 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			int contextPassageLength = 150;
 			String contextHighlightBegin = HTMLFormatterWithScore.DEFAULT_PRE_TAG;
 			String contextHighlightEnd = HTMLFormatterWithScore.DEFAULT_POST_TAG;
+
+			// Hybrid search parameters (new)
+			float keywordWeight = 0.5f;
+			float vectorWeight = 0.5f;
+
 			String tmp;
 			System.err.print("SearchDataImpl:" + data.getClass().getName());
 			if (data instanceof SearchDataImpl) {
@@ -592,6 +607,11 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					tmp = cast.toString(attrs.get("contextHighlightEnd"), null);
 					if (!Util.isEmpty(tmp, true))
 						contextHighlightEnd = tmp;
+
+					// Get hybrid search parameters (new) TODO
+					keywordWeight = cast.toFloatValue(attrs.get("keywordWeight"), keywordWeight);
+					vectorWeight = cast.toFloatValue(attrs.get("vectorWeight"), vectorWeight);
+
 				}
 			}
 
@@ -601,6 +621,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			System.err.println("contextPassageLength: " + contextPassageLength);
 			System.err.println("contextHighlightBegin: " + contextHighlightBegin);
 			System.err.println("contextHighlightEnd: " + contextHighlightEnd);
+			System.err.println("keywordWeight: " + keywordWeight);
+			System.err.println("vectorWeight: " + vectorWeight);
 
 			HTMLFormatterWithScore formatter = null;
 			if (!criteria.equals("*")) {
@@ -610,9 +632,44 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				else
 					criteria = op.toString();
 
-				query = new QueryParser("contents", analyzer).parse(criteria);
-				formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
+				// Create keyword query
+				Query keywordQuery = new QueryParser("contents", analyzer).parse(criteria);
+				query = keywordQuery; // Default to keyword query
 
+				// Add vector search if enabled and service is available
+				if (getEmbeddingService() != null && !criteria.equals("*")) {
+					try {
+						// Generate embedding for query
+						float[] queryVector = getEmbeddingService().generate(criteria);
+
+						// Create vector query
+						KnnVectorQuery vectorQuery = new KnnVectorQuery("embedding", queryVector, 100);
+
+						// Combine queries for hybrid search
+						BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
+
+						// Add both query types with weights
+						BoostQuery boostedKeywordQuery = new BoostQuery(keywordQuery, keywordWeight);
+						BoostQuery boostedVectorQuery = new BoostQuery(vectorQuery, vectorWeight);
+
+						bqBuilder.add(boostedKeywordQuery, BooleanClause.Occur.SHOULD);
+						bqBuilder.add(boostedVectorQuery, BooleanClause.Occur.SHOULD);
+
+						// Set the final hybrid query
+						query = bqBuilder.build();
+
+						// Log hybrid search usage
+						log.log(Log.LEVEL_INFO, "Collection:" + getName(),
+								"Using hybrid search with weights - Keyword: " + keywordWeight + ", Vector: "
+										+ vectorWeight);
+					} catch (Exception e) {
+						// Log error but continue with keyword search
+						log.log(Log.LEVEL_ERROR, "Collection:" + getName(),
+								"Error in vector search: " + e.getMessage() + " - Falling back to keyword search", e);
+					}
+				}
+
+				formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
 			}
 			Resource[] files = _getIndexDirectories();
 
@@ -867,10 +924,52 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	 * @throws PageException
 	 * @throws InterruptedException
 	 */
+
 	private void _index(IndexWriter writer, Resource file, String url) throws IOException, PageException {
 		if (!file.exists())
 			return;
-		writer.addDocument(DocumentUtil.toDocument(file, url, engine.getSystemUtil().getCharset().name()));
+
+		writer.addDocument(embed(DocumentUtil.toDocument(file, url, engine.getSystemUtil().getCharset().name())));
+	}
+
+	private Document embed(Document doc) throws IOException {
+		EmbeddingService es = getEmbeddingService();
+		if (es != null) {
+			String contents = doc.get("contents");
+			if (contents != null) {
+				float[] embedding = es.generate(contents);
+
+				// Add the vector field
+				doc.add(new KnnVectorField("embedding", embedding, VectorSimilarityFunction.COSINE));
+			}
+
+		}
+		return doc;
+	}
+
+	public EmbeddingService getEmbeddingService() throws IOException {
+		if (embeddingService == null) {
+			if (!Util.isEmpty(embedding, true)) {
+				if (TF_IDF.equalsIgnoreCase(embedding)) {
+					embeddingService = new TfIdfEmbeddingService();
+				} else if (WORD2VEC.equalsIgnoreCase(embedding)) {
+					embeddingService = new Word2VecEmbeddingService();
+				}
+				// TODO allow bundle defintion and Maven
+				else {
+					embeddingService = (EmbeddingService) CFMLEngineFactory.getInstance().getClassUtil()
+							.loadInstance(embedding);
+
+				}
+				embeddingService.init(null, CFMLEngineFactory.getInstance().getCreationUtil().createStruct());
+			}
+		}
+		return embeddingService;
+	}
+
+	@Override
+	public String getEmbedding() {
+		return embedding;
 	}
 
 	/**

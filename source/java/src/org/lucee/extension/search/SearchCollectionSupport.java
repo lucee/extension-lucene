@@ -880,4 +880,5 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 		return query;
 	}
 
+	public abstract String getEmbedding();
 }
