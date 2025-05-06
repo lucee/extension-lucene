@@ -19,10 +19,10 @@ public final class LuceneSearchEngine extends SearchEngineSupport {
 	}
 
 	@Override
-	public SearchCollection _createCollection(String name, Resource path, String language, String embedding)
-			throws SearchException {
+	public SearchCollection _createCollection(String name, Resource path, String language, String mode,
+			String embedding, double ratio) throws SearchException {
 		DateTime now = CFMLEngineFactory.getInstance().getCreationUtil().createDateTime(System.currentTimeMillis());
-		return new LuceneSearchCollection(this, name, path, language, now, now, true, embedding);
+		return new LuceneSearchCollection(this, name, path, language, now, now, true, mode, embedding, ratio);
 	}
 
 	@Override
@@ -32,9 +32,10 @@ public final class LuceneSearchEngine extends SearchEngineSupport {
 
 	@Override
 	public SearchCollection _readCollection(String name, Resource path, String language, DateTime lastUpdate,
-			DateTime created, String embedding) throws SearchException {
+			DateTime created, String mode, String embedding, double ratio) throws SearchException {
 		// throw new SearchException("Lucene Search Engine not implemeted");
-		return new LuceneSearchCollection(this, name, path, language, lastUpdate, created, true, embedding);
+		return new LuceneSearchCollection(this, name, path, language, lastUpdate, created, true, mode, embedding,
+				ratio);
 	}
 
 	@Override

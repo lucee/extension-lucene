@@ -2,7 +2,6 @@ package org.lucee.extension.search;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import lucee.runtime.search.SearchData;
 
@@ -66,14 +65,5 @@ public class SearchDataImpl implements SearchData {
 
 	public Map<String, Object> getAddionalAttributes() {
 		return attrs;
-	}
-
-	public void dumpAddionalAttributes() {
-		if (attrs != null) {
-			System.err.println("--- addional attributes ---");
-			for (Entry<String, Object> e : attrs.entrySet()) {
-				System.err.println("- " + e.getKey() + ":" + e.getValue());
-			}
-		}
 	}
 }

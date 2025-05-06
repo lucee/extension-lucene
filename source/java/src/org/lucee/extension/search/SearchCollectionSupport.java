@@ -1,6 +1,7 @@
 package org.lucee.extension.search;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -10,7 +11,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.w3c.dom.Element;
+import org.apache.lucene.index.IndexReader;
+import org.lucee.extension.search.lucene.util.CommonUtil;
 
 import lucee.commons.io.log.Log;
 import lucee.commons.io.res.Resource;
@@ -28,9 +30,11 @@ import lucee.runtime.search.SearchEngine;
 import lucee.runtime.search.SearchException;
 import lucee.runtime.search.SearchIndex;
 import lucee.runtime.search.SearchResulItem;
+import lucee.runtime.type.Array;
 import lucee.runtime.type.Collection.Key;
 import lucee.runtime.type.Query;
 import lucee.runtime.type.QueryColumn;
+import lucee.runtime.type.Struct;
 import lucee.runtime.type.dt.DateTime;
 import lucee.runtime.util.Creation;
 import lucee.runtime.util.HTTPUtil;
@@ -170,8 +174,8 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 		language = SearchUtil.translateLanguage(language);
 		Lock l = lock();
 		try {
-			SearchIndex si = new SearchIndexImpl(title, key, type, query, extensions, language, urlpath, categoryTree,
-					categories, custom1, custom2, custom3, custom4);
+			SearchIndex si = new SearchIndexImpl(this, title, key, type, query, extensions, language, urlpath,
+					categoryTree, categories, custom1, custom2, custom3, custom4);
 			String id = si.getId();
 			IndexResult ir = IndexResultImpl.EMPTY;
 			if (type == SearchIndex.TYPE_FILE) {
@@ -434,18 +438,23 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 			}
 		}
 
-		Element collElement = searchEngine.getCollectionElement(name);
+		Struct sctColl = searchEngine.getCollectionStruct(name);
 
 		// Insert
 		if (otherIndex == null) {
 			addIndex(index);
-			collElement.appendChild(searchEngine.toElement(index));
+			Array arrIdx = engine.getCastUtil().toArray(sctColl.get("indexes", null), null);
+			if (arrIdx == null) {
+				arrIdx = engine.getCreationUtil().createArray();
+				sctColl.setEL("indexes", arrIdx);
+			}
+			arrIdx.appendEL(searchEngine.toStruct(index));
 		}
 		// Update
 		else {
 			addIndex(index);
-			Element el = searchEngine.getIndexElement(collElement, index.getId());
-			searchEngine.setAttributes(el, index);
+			Struct sctIdx = searchEngine.getIndexStruct(sctColl, index.getId());
+			searchEngine.setAttributes(sctIdx, index);
 		}
 		changeLastUpdate();
 	}
@@ -530,7 +539,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 				QueryColumn keyColumn = qv.getColumn(k);
 				return deleteCustom("custom", keyColumn);
 			} catch (PageException pe) {
-				throw new SearchException(pe);
+				throw CommonUtil.toSearchException(pe);
 			}
 		}
 		return deleteIndexNotCustom(pc, key, type, queryName);
@@ -546,9 +555,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 				SearchIndex index = indexes.get(id);
 
 				IndexResult ir = _deleteIndex(index.getId());
-				Element indexEl = searchEngine.getIndexElement(searchEngine.getCollectionElement(name), index.getId());
-				if (indexEl != null)
-					indexEl.getParentNode().removeChild(indexEl);
+				searchEngine.removeIndexStruct(searchEngine.getCollectionStruct(name), index.getId());
 				changeLastUpdate();
 				return ir;
 			}
@@ -602,7 +609,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 	 */
 	private void changeLastUpdate() throws SearchException {
 		lastUpdate = engine.getCreationUtil().createDateTime(System.currentTimeMillis());
-		searchEngine.store();
+		searchEngine.store(true);
 	}
 
 	@Override
@@ -817,7 +824,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 			return lock.lock(getId(), LOCK_TIMEOUT);
 			// manager.lock(LockManager.TYPE_EXCLUSIVE,getId(),LOCK_TIMEOUT,ThreadLocalPageContext.get().getId());
 		} catch (Exception e) {
-			throw new SearchException(e);
+			throw CommonUtil.toSearchException(e);
 		}
 
 	}
@@ -837,9 +844,9 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 
 		final String v = "VARCHAR";
 		Query query = null;
-		String[] cols = new String[] { "categories", "categoryTree", "custom1", "custom2", "custom3", "custom4",
-				"extensions", "key", "language", "query", "title", "urlpath", "type" };
-		String[] types = new String[] { v, v, v, v, v, v, v, v, v, v, v, v, v };
+		String[] cols = new String[] { "id", "type", "custom1", "custom2", "custom3", "custom4", "extensions", "key",
+				"language", "query", "title", "urlpath", "doccount", "categories", "categoryTree" };
+		String[] types = new String[] { v, v, v, v, v, v, v, v, v, v, v, v, v, v };
 		try {
 			query = engine.getCreationUtil().createQuery(cols, types, 0, "query");
 		} catch (PageException e) {
@@ -849,6 +856,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 		Entry<String, SearchIndex> entry;
 		SearchIndex index;
 		int row = 0;
+		IndexReader reader;
 		while (it.hasNext()) {
 			query.addRow();
 			row++;
@@ -858,6 +866,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 				continue;
 			try {
 
+				query.setAt("id", row, index.getId());
 				query.setAt("categories", row, engine.getListUtil().toList(index.getCategories(), ""));
 				query.setAt("categoryTree", row, index.getCategoryTree());
 
@@ -874,6 +883,20 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 				query.setAt("urlpath", row, index.getUrlpath());
 				query.setAt("type", row, SearchIndexImpl.toStringTypeEL(index.getType()));
 
+				if (index instanceof SearchIndexImpl) {
+					SearchIndexImpl sii = (SearchIndexImpl) index;
+					reader = null;
+					try {
+						reader = sii.getIndexReader();
+						query.setAt("doccount", row, reader.numDocs());
+					} catch (IOException ioe) {
+					} finally {
+						if (reader != null) {
+							CommonUtil.closeSilently(reader);
+						}
+					}
+				}
+
 			} catch (PageException pe) {
 			}
 		}
@@ -881,4 +904,8 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 	}
 
 	public abstract String getEmbedding();
+
+	public abstract String getMode();
+
+	public abstract double getRatio();
 }

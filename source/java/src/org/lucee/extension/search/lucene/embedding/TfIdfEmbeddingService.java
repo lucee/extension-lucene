@@ -1,194 +1,147 @@
 package org.lucee.extension.search.lucene.embedding;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 
 import lucee.commons.io.log.Log;
+import lucee.commons.io.res.Resource;
+import lucee.loader.engine.CFMLEngineFactory;
 import lucee.loader.util.Util;
 import lucee.runtime.config.Config;
+import lucee.runtime.exp.PageException;
 import lucee.runtime.type.Struct;
 
+// https://raw.githubusercontent.com/dwyl/english-words/refs/heads/master/words_alpha.txt
+// https://raw.githubusercontent.com/dwyl/english-words/refs/heads/master/words.zip
+// https://github.com/oprogramador/most-common-words-by-language/tree/master/src/resources
 /**
  * A TF-IDF embedding service implementation that doesn't rely on any external
  * mathematical libraries.
  */
 public final class TfIdfEmbeddingService extends EmbeddingServiceSupport {
 
-	private static int EMBEDDING_DIMENSION = 500;
+	private static final int DEFAULT_EMBEDDING_DIMENSION = 100;
+	// private static final String DEFAULT_EMBEDDING_PATH =
+	// "https://raw.githubusercontent.com/dwyl/english-words/refs/heads/master/words_alpha.txt";
 
 	private Map<String, Integer> vocabulary;
 	private Map<String, Double> idf;
 	private int embeddingDimension;
 	private Map<String, float[]> embeddingCache;
 	private int documentCount;
+	private String language;
 
 	@Override
 	public void init(Config config, Struct parameters) throws IOException {
 		super.init(config, parameters);
 
-		// load config
-		// TODO it somehow
-		String embeddingPath = eng.getCastUtil().toString(parameters.get("embeddingPath", null), null);
-		embeddingDimension = eng.getCastUtil().toIntValue(parameters.get("embeddingPath", null), EMBEDDING_DIMENSION);
-
 		this.vocabulary = new HashMap<>();
 		this.idf = new HashMap<>();
 		this.embeddingCache = new ConcurrentHashMap<>();
-		this.documentCount = 1; // Default to 1 to avoid division by zero
+		this.documentCount = 1;
 
-		// Try to load vocabulary and IDF values from the specified path
-		if (!Util.isEmpty(embeddingPath, true)) {
-			try {
-				loadVocabulary(embeddingPath);
-			} catch (Exception e) {
-				getLog().log(Log.LEVEL_ERROR, "search-embedding", "search-embedding", e);
-				// Fall back to default initialization
-				initializeDefaultVocabulary();
-			}
-		} else {
-			initializeDefaultVocabulary();
-		}
-	}
+		// TODO read from env var
 
-	/**
-	 * Initialize with a default vocabulary.
-	 */
-	private void initializeDefaultVocabulary() {
-		getLog().log(Log.LEVEL_INFO, "search-embedding", "Initializing default TF-IDF vocabulary");
+		// language
+		language = eng.getCastUtil().toString(parameters.get("language", "english"), "english").toLowerCase().trim();
+		if (Util.isEmpty(language))
+			language = "english";
 
-		// Add common English words as default vocabulary
-		String[] commonWords = { "the", "of", "and", "a", "to", "in", "is", "you", "that", "it", "he", "was", "for",
-				"on", "are", "as", "with", "his", "they", "at", "be", "this", "have", "from", "or", "one", "had", "by",
-				"word", "but", "not", "what", "all", "were", "we", "when", "your", "can", "said", "there", "use", "an",
-				"each", "which", "she", "do", "how", "their", "if", "will", "up", "other", "about", "out", "many",
-				"then", "them", "these", "so", "some", "her", "would", "make", "like", "him", "into", "time", "has",
-				"look", "two", "more", "write", "go", "see", "number", "no", "way", "could", "people", "my", "than",
-				"first", "water", "been", "call", "who", "oil", "its", "now", "find", "long", "down", "day", "did",
-				"get", "come", "made", "may", "part" };
+		// embeddingDimension
+		embeddingDimension = eng.getCastUtil().toIntValue(parameters.get("embeddingDimension", null),
+				DEFAULT_EMBEDDING_DIMENSION);
 
-		// Limit to embedding dimension or array length, whichever is smaller
-		int limit = Math.min(commonWords.length, embeddingDimension);
+		String embeddingPath = eng.getCastUtil().toString(parameters.get("embeddingPath", null), null);
 
-		for (int i = 0; i < limit; i++) {
-			vocabulary.put(commonWords[i], i);
-			// Assign artificial IDF values (more common words get lower IDF)
-			double artificialIdf = 1.0 + (0.5 * i / limit);
-			idf.put(commonWords[i], artificialIdf);
-		}
+		try {
+			Resource embeddingResource;
 
-		documentCount = 1000; // Artificial document count
-	}
+			// nothing defined, we used the bundled version
+			if (Util.isEmpty(embeddingPath, true)) {
+				String lang = "english";
+				embeddingResource = config.getConfigDir().getRealResource("search/embedding/words/" + lang + ".txt");
+				extractEmbeddingPath(embeddingResource);
 
-	/**
-	 * Load vocabulary and IDF values from a file or directory.
-	 */
-	private void loadVocabulary(String path) throws IOException {
-		Path embeddingPath = Paths.get(path);
-
-		if (Files.isDirectory(embeddingPath)) {
-			// If it's a directory, analyze files to build vocabulary
-			buildVocabularyFromCorpus(embeddingPath);
-		} else if (Files.isRegularFile(embeddingPath)) {
-			// If it's a file, assume it's a vocabulary file
-			loadVocabularyFromFile(embeddingPath);
-		} else {
-			throw new IOException("Embedding path is neither a valid directory nor a file");
-		}
-	}
-
-	/**
-	 * Build vocabulary by analyzing a corpus of documents.
-	 */
-	private void buildVocabularyFromCorpus(Path corpusDir) throws IOException {
-		getLog().log(Log.LEVEL_INFO, "search-embedding", "Building vocabulary from corpus: " + corpusDir);
-
-		// Collect document frequencies
-		Map<String, Integer> docFrequencies = new HashMap<>();
-
-		// Process each text file in the directory
-		try (var files = Files.walk(corpusDir)) {
-			List<Path> textFiles = files.filter(Files::isRegularFile)
-					.filter(p -> p.toString().endsWith(".txt") || p.toString().endsWith(".text"))
-					.collect(Collectors.toList());
-			documentCount = textFiles.size();
-
-			for (Path file : textFiles) {
-				String content = Files.readString(file);
-				Set<String> uniqueWords = new HashSet<>(tokenize(content));
-
-				// Update document frequencies
-				for (String word : uniqueWords) {
-					docFrequencies.put(word, docFrequencies.getOrDefault(word, 0) + 1);
-				}
-			}
-		}
-
-		// Select top terms by frequency to build vocabulary (up to embeddingDimension)
-		List<Map.Entry<String, Integer>> sortedTerms = new ArrayList<>(docFrequencies.entrySet());
-		sortedTerms.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-
-		// Build vocabulary with indices
-		int limit = Math.min(sortedTerms.size(), embeddingDimension);
-		for (int i = 0; i < limit; i++) {
-			String term = sortedTerms.get(i).getKey();
-			vocabulary.put(term, i);
-
-			// Calculate IDF for each term
-			int df = docFrequencies.get(term);
-			double idfValue = Math.log((double) documentCount / df) + 1.0;
-			idf.put(term, idfValue);
-		}
-	}
-
-	/**
-	 * Load vocabulary and IDF values from a file.
-	 */
-	private void loadVocabularyFromFile(Path vocabFile) throws IOException {
-		getLog().log(Log.LEVEL_INFO, "search-embedding", "Loading vocabulary from file: " + vocabFile);
-
-		try (BufferedReader reader = new BufferedReader(new FileReader(vocabFile.toFile()))) {
-			String line;
-			int index = 0;
-
-			// First line might be a header with document count
-			line = reader.readLine();
-			if (line.startsWith("DOCUMENT_COUNT:")) {
-				documentCount = Integer.parseInt(line.substring(15).trim());
-				line = reader.readLine();
-			}
-
-			// Read vocabulary terms and their IDF values
-			while (line != null && index < embeddingDimension) {
-				String[] parts = line.split("\\t");
-				if (parts.length >= 2) {
-					String term = parts[0];
-					double idfValue = Double.parseDouble(parts[1]);
-
-					vocabulary.put(term, index);
-					idf.put(term, idfValue);
-					index++;
+				if (!"english".equals(language)) {
+					throw new IOException(
+							"TF-IDF embedding service only provides words for english, for other languages you need to provide words,"
+									+ "to do so you can for example download them from here [https://github.com/oprogramador/most-common-words-by-language/tree/master/src/resources]"
+									+ "and then copy to [lucee-server/context/search/embedding/words/" + language
+									+ ".txt], you will find an example for english in that directory.");
 				}
 
-				line = reader.readLine();
 			}
+			// we use the version defined
+			else {
+				embeddingResource = CFMLEngineFactory.getInstance().getCastUtil().toResource(embeddingPath);
+			}
+
+			// is it a remote file (s3,http,...) we copy it lokal
+			boolean compressed = embeddingResource.getName().endsWith(".gz")
+					|| embeddingResource.getName().endsWith(".gzip");
+			if (!"file".equalsIgnoreCase(embeddingResource.getResourceProvider().getScheme()) || compressed) {
+				Resource local = config.getConfigDir().getRealResource("search/embedding/words/" + language + ".txt");
+				local.getParentResource().mkdirs();
+				// copy it lokal, in case it is a gzip, we uncompress it
+				// TODO support other compress formats
+				CFMLEngineFactory.getInstance().getIOUtil()
+						.copy(compressed ? new GZIPInputStream(embeddingResource.getInputStream())
+								: embeddingResource.getInputStream(), local, true);
+				embeddingResource = local;
+			}
+
+			File embeddingFile = CFMLEngineFactory.getInstance().getCastUtil().toFile(embeddingResource);
+
+			loadVocabularyFromFile(embeddingFile.toPath());
+
+		} catch (PageException e) {
+			throw CFMLEngineFactory.getInstance().getExceptionUtil().toIOException(e);
+		}
+
+	}
+
+	private Resource extractEmbeddingPath(Resource destination) throws IOException {
+		// Get the input stream from the JAR resource
+		InputStream is = null;
+		try {
+			is = getClass().getResourceAsStream("resources/embedding/words/english.txt.gz");
+			if (is == null) {
+				is = getClass().getResourceAsStream("/resources/embedding/words/english.txt.gz");
+			}
+			if (is == null) {
+				throw new IOException("Could not find embedded resource: /resources/embedding/words/english.txt.gz");
+			}
+
+			destination.getParentResource().mkdirs();
+
+			// Decompress directly to the destination
+			CFMLEngineFactory.getInstance().getIOUtil().copy(new GZIPInputStream(is), destination, true);
+
+			return destination;
+		} finally {
+			Util.closeEL(is);
 		}
 	}
 
 	@Override
 	public float[] generate(String text) {
+		// Added safety check for null text
+		if (text == null) {
+			text = "";
+		}
+
 		// Check cache first
 		if (embeddingCache.containsKey(text)) {
 			return embeddingCache.get(text);
@@ -203,7 +156,7 @@ public final class TfIdfEmbeddingService extends EmbeddingServiceSupport {
 			termFrequencies.put(token, termFrequencies.getOrDefault(token, 0) + 1);
 		}
 
-		// Create the TF-IDF vector
+		// Create the TF-IDF vector with safety check for dimension
 		float[] embedding = new float[embeddingDimension];
 
 		// Fill embedding vector
@@ -219,13 +172,94 @@ public final class TfIdfEmbeddingService extends EmbeddingServiceSupport {
 			}
 		}
 
-		// Normalize the vector (L2 normalization)
+		// Enhanced normalization
 		normalizeVector(embedding);
+
+		// Check for NaN or Infinity after normalization
+		for (int i = 0; i < embedding.length; i++) {
+			if (Float.isNaN(embedding[i]) || Float.isInfinite(embedding[i])) {
+				embedding[i] = 0.0f;
+			}
+		}
+
+		// Add minimal non-zero values to ensure vector isn't all zeros
+		boolean allZeros = true;
+		for (float val : embedding) {
+			if (val != 0.0f) {
+				allZeros = false;
+				break;
+			}
+		}
+
+		if (allZeros) {
+			// Add a small value to first element to avoid all-zero vectors
+			embedding[0] = 0.00001f;
+		}
 
 		// Cache the result
 		embeddingCache.put(text, embedding);
 
 		return embedding;
+	}
+
+	/**
+	 * Enhanced normalization with better handling of edge cases
+	 */
+	private void normalizeVector(float[] vector) {
+		// Calculate L2 norm (Euclidean length)
+		float norm = 0;
+		for (float v : vector) {
+			norm += v * v;
+		}
+
+		// Only normalize if norm is significant (avoid division by very small numbers)
+		if (norm > 0.000001f) {
+			norm = (float) Math.sqrt(norm);
+			for (int i = 0; i < vector.length; i++) {
+				vector[i] /= norm;
+			}
+		} else if (norm > 0) {
+			// For very small norms, use a more stable approach
+			for (int i = 0; i < vector.length; i++) {
+				if (vector[i] != 0) {
+					vector[i] = vector[i] > 0 ? 1.0f : -1.0f;
+					break; // Just set one non-zero element
+				}
+			}
+		}
+	}
+
+	/**
+	 * Load vocabulary and IDF values from a file.
+	 */
+	private void loadVocabularyFromFile(Path vocabFile) throws IOException {
+		getLog().log(Log.LEVEL_INFO, "search-embedding", "Loading vocabulary from file: " + vocabFile);
+
+		List<String> allWords = Files.readAllLines(vocabFile);
+
+		// Filter out empty lines
+		allWords = allWords.stream().map(String::trim).filter(line -> !line.isEmpty()).collect(Collectors.toList());
+
+		getLog().log(Log.LEVEL_INFO, "search-embedding", "Found " + allWords.size() + " words in vocabulary file");
+
+		// Limit to embeddingDimension
+		int limit = Math.min(allWords.size(), embeddingDimension);
+
+		for (int i = 0; i < limit; i++) {
+			String term = allWords.get(i);
+			vocabulary.put(term, i);
+
+			// Calculate IDF value based on position in list
+			// Words earlier in the list are presumed more common and get lower IDF values
+			double idfValue = 1.0 + Math.log(1.0 + (double) i / limit * 10.0);
+			idf.put(term, idfValue);
+		}
+
+		// Set document count based on vocabulary size
+		documentCount = Math.max(allWords.size() * 10, 1000);
+
+		getLog().log(Log.LEVEL_INFO, "search-embedding",
+				"Initialized vocabulary with " + limit + " words out of " + allWords.size() + " total words");
 	}
 
 	/**
@@ -236,32 +270,28 @@ public final class TfIdfEmbeddingService extends EmbeddingServiceSupport {
 			return new ArrayList<>();
 		}
 
-		// Simple tokenization - lowercase, remove punctuation, split on whitespace
-		String preprocessed = text.toLowerCase().replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+		if ("english".equals(language)) {
+			// Simple tokenization for English - lowercase, remove punctuation, split on
+			// whitespace
+			String preprocessed = text.toLowerCase().replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
 
-		if (preprocessed.isEmpty()) {
-			return new ArrayList<>();
-		}
-
-		return Arrays.asList(preprocessed.split(" "));
-	}
-
-	/**
-	 * Normalize a vector to unit length (L2 normalization).
-	 */
-	private void normalizeVector(float[] vector) {
-		// Calculate L2 norm (Euclidean length)
-		float norm = 0;
-		for (float v : vector) {
-			norm += v * v;
-		}
-
-		// Only normalize if norm is non-zero
-		if (norm > 0) {
-			norm = (float) Math.sqrt(norm);
-			for (int i = 0; i < vector.length; i++) {
-				vector[i] /= norm;
+			if (preprocessed.isEmpty()) {
+				return new ArrayList<>();
 			}
+
+			return Arrays.asList(preprocessed.split(" "));
+		} else {
+			// For future multilingual support
+			// Basic fallback for all languages
+			String preprocessed = text.toLowerCase().replaceAll("[^\\p{L}\\p{N}\\s]", " ") // Unicode-aware pattern for
+																							// letters and numbers
+					.replaceAll("\\s+", " ").trim();
+
+			if (preprocessed.isEmpty()) {
+				return new ArrayList<>();
+			}
+
+			return Arrays.asList(preprocessed.split(" "));
 		}
 	}
 

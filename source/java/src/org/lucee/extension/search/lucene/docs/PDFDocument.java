@@ -52,7 +52,6 @@ public final class PDFDocument {
 	 *             If there is an error parsing or indexing the document.
 	 */
 	public static Document getDocument(Resource res) throws PageException, IOException {
-		System.err.println("pdf: " + res);
 		if (!(res instanceof File)) {
 			return DocumentSupport.add(addContent(null, res.getInputStream(), true), res);
 		}
@@ -124,8 +123,6 @@ public final class PDFDocument {
 		// is shared as long as the buffer content is not modified, which will
 		// not occur here.
 		String contents = writer.getBuffer().toString();
-		System.err.println(contents);
-
 		if (content != null)
 			content.append(contents);
 

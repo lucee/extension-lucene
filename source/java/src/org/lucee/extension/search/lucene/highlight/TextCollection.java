@@ -371,4 +371,9 @@ public class TextCollection implements Castable, Struct {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+	@Override
+	public boolean containsKey(PageContext pc, Key key) {
+		return containsKey(key);
+	}
 }

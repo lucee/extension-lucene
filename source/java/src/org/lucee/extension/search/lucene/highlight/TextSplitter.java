@@ -124,37 +124,51 @@ public class TextSplitter {
 		return index;
 	}
 
-	public static void main(String[] args) {
-		// Sample text with paragraphs
-		String text = "The red fox is one of nature's most adaptable creatures. In the dense forest, "
-				+ "a clever fox makes its home beneath an old oak tree! Every evening, this fox emerges "
-				+ "to hunt for mice and rabbits. The local farmers often spot the fox near their chicken coops, "
-				+ "though this particular fox seems more interested in the field mice. Urban areas have their own "
-				+ "fox populations too. A mother fox was recently seen raising her cubs in the city park.\n\n "
-				+ "Scientists studying fox behavior have noted that urban foxes are becoming increasingly comfortable "
-				+ "around humans. The fox's distinctive red coat and bushy tail make it easily recognizable. "
-				+ "In winter, the fox's coat becomes thicker and even more luxurious. Young fox cubs begin learning "
-				+ "to hunt at about three months old. The mother fox teaches them essential hunting skills.\n\n "
-				+ "Arctic fox species are different from red foxes, changing their coat color with the seasons. "
-				+ "But our local red fox maintains its rusty color throughout the year. The fox's keen sense of smell "
-				+ "and excellent hearing make it a superb hunter. Sometimes, a fox can be seen playing with its prey "
-				+ "before making the final catch. The playful nature of the fox has been documented in many studies.";
-
-		text = "# File system - Mappings\n" + "\n" + "We distinguish 3 different mapping types:\n" + "\n"
-				+ "- \"component\" mappings used to map components (similar to a classpath in Java),\n"
-				+ "- \"custom tag\" mappings used to map custom tags\n"
-				+ "- \"regular mappings\" for the rest ([[tag-include]], [[tag-file]] ...).\n" + "\n"
-				+ "* [[cookbook-filesystem-mapping-define-mapping]]\n"
-				+ "* [[cookbook-application-context-set-mapping]]\n" + "* Define a component Mapping (TODO)\n"
-				+ "* Define a custom tag Mapping (TODO) Mapping,Component mapping,Custom tag mapping,Regular mapping,File system ";
-
-		System.out.println(text.length());
-		TextSplitter ps = new TextSplitter(1000);
-		for (Text s : ps.split(text)) {
-			System.out.println("---- " + s.length() + " ----");
-			System.out.println(s.text);
-		}
-		System.out.println(text.length());
-
-	}
+	/*
+	 * public static void main(String[] args) { // Sample text with paragraphs
+	 * String text =
+	 * "The red fox is one of nature's most adaptable creatures. In the dense forest, "
+	 * +
+	 * "a clever fox makes its home beneath an old oak tree! Every evening, this fox emerges "
+	 * +
+	 * "to hunt for mice and rabbits. The local farmers often spot the fox near their chicken coops, "
+	 * +
+	 * "though this particular fox seems more interested in the field mice. Urban areas have their own "
+	 * +
+	 * "fox populations too. A mother fox was recently seen raising her cubs in the city park.\n\n "
+	 * +
+	 * "Scientists studying fox behavior have noted that urban foxes are becoming increasingly comfortable "
+	 * +
+	 * "around humans. The fox's distinctive red coat and bushy tail make it easily recognizable. "
+	 * +
+	 * "In winter, the fox's coat becomes thicker and even more luxurious. Young fox cubs begin learning "
+	 * +
+	 * "to hunt at about three months old. The mother fox teaches them essential hunting skills.\n\n "
+	 * +
+	 * "Arctic fox species are different from red foxes, changing their coat color with the seasons. "
+	 * +
+	 * "But our local red fox maintains its rusty color throughout the year. The fox's keen sense of smell "
+	 * +
+	 * "and excellent hearing make it a superb hunter. Sometimes, a fox can be seen playing with its prey "
+	 * +
+	 * "before making the final catch. The playful nature of the fox has been documented in many studies."
+	 * ;
+	 * 
+	 * text = "# File system - Mappings\n" + "\n" +
+	 * "We distinguish 3 different mapping types:\n" + "\n" +
+	 * "- \"component\" mappings used to map components (similar to a classpath in Java),\n"
+	 * + "- \"custom tag\" mappings used to map custom tags\n" +
+	 * "- \"regular mappings\" for the rest ([[tag-include]], [[tag-file]] ...).\n"
+	 * + "\n" + "* [[cookbook-filesystem-mapping-define-mapping]]\n" +
+	 * "* [[cookbook-application-context-set-mapping]]\n" +
+	 * "* Define a component Mapping (TODO)\n" +
+	 * "* Define a custom tag Mapping (TODO) Mapping,Component mapping,Custom tag mapping,Regular mapping,File system "
+	 * ;
+	 * 
+	 * TextSplitter ps = new TextSplitter(1000); for (Text s : ps.split(text)) {
+	 * System.out.println("---- " + s.length() + " ----");
+	 * System.out.println(s.text); } System.out.println(text.length());
+	 * 
+	 * }
+	 */
 }

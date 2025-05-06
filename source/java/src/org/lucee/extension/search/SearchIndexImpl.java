@@ -1,7 +1,15 @@
 package org.lucee.extension.search;
 
+import java.io.File;
+import java.io.IOException;
+
+import org.apache.lucene.index.IndexReader;
+import org.lucee.extension.search.lucene.LuceneSearchCollection;
+
+import lucee.commons.io.res.Resource;
 import lucee.loader.engine.CFMLEngine;
 import lucee.loader.engine.CFMLEngineFactory;
+import lucee.runtime.search.SearchCollection;
 import lucee.runtime.search.SearchException;
 import lucee.runtime.search.SearchIndex;
 
@@ -26,6 +34,7 @@ public final class SearchIndexImpl implements SearchIndex {
 	 */
 	public static final short TYPE_URL = 3;
 
+	private final SearchCollection coll;
 	private String id;
 	private String title;
 	private String key;
@@ -56,10 +65,11 @@ public final class SearchIndexImpl implements SearchIndex {
 	 * @param custom3
 	 * @param custom4
 	 */
-	protected SearchIndexImpl(String id, String title, String key, short type, String query, String[] extensions,
-			String language, String urlpath, String categoryTree, String[] categories, String custom1, String custom2,
-			String custom3, String custom4) {
+	protected SearchIndexImpl(SearchCollection coll, String id, String title, String key, short type, String query,
+			String[] extensions, String language, String urlpath, String categoryTree, String[] categories,
+			String custom1, String custom2, String custom3, String custom4) {
 		engine = CFMLEngineFactory.getInstance();
+		this.coll = coll;
 		this.title = title;
 		this.id = id;
 		this.key = key;
@@ -96,11 +106,12 @@ public final class SearchIndexImpl implements SearchIndex {
 	 * @param custom3
 	 * @param custom4
 	 */
-	protected SearchIndexImpl(String title, String key, short type, String query, String[] extensions, String language,
-			String urlpath, String categoryTree, String[] categories, String custom1, String custom2, String custom3,
-			String custom4) {
+	protected SearchIndexImpl(SearchCollection coll, String title, String key, short type, String query,
+			String[] extensions, String language, String urlpath, String categoryTree, String[] categories,
+			String custom1, String custom2, String custom3, String custom4) {
 		engine = CFMLEngineFactory.getInstance();
 
+		this.coll = coll;
 		this.title = title;
 		this.key = key;
 		this.type = type;
@@ -309,11 +320,20 @@ public final class SearchIndexImpl implements SearchIndex {
 	 * @param queryName
 	 * @return id from given data
 	 */
+	private String toId() {
+		return CFMLEngineFactory.getInstance().getSystemUtil().hash64b(toString());
+	}
+
 	public static String toId(short type, String key, String queryName) {
-		if (type == SearchIndex.TYPE_CUSTOM)
-			return "custom";
+
+		if (type == SearchIndex.TYPE_CUSTOM) {
+			CFMLEngine en = CFMLEngineFactory.getInstance();
+			return toStringTypeEL(type) + "-" + en.getSystemUtil().hash64b(key + ":" + queryName);
+			// return "custom";
+		}
+
 		CFMLEngine en = CFMLEngineFactory.getInstance();
-		return toStringTypeEL(type) + "-" + en.getSystemUtil().hash64b(key + null);
+		return toStringTypeEL(type) + "-" + en.getSystemUtil().hash64b(key);
 		// null is for backward compatibility to older collections
 	}
 
@@ -331,5 +351,15 @@ public final class SearchIndexImpl implements SearchIndex {
 	@Override
 	public String getCategoryTree() {
 		return categoryTree;
+	}
+
+	public IndexReader getIndexReader() throws IOException {
+		if (coll instanceof LuceneSearchCollection) {
+			Resource dir = ((LuceneSearchCollection) coll).getRootDirectory().getRealResource(getId());
+			if (!(dir instanceof File))
+				throw new IOException("only local indexes are supported.");
+			return LuceneSearchCollection._getReader(((File) dir).toPath());
+		}
+		throw new IOException("unable to load a reader");
 	}
 }

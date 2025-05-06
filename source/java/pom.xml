@@ -200,6 +200,17 @@
                 </configuration>
             </plugin>
         </plugins>
+        <resources>
+            <resource>
+                <!-- Keep src as the directory -->
+                <directory>src</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <!-- Only include the resources directory -->
+                    <include>resources/**</include>
+                </includes>
+            </resource>
+        </resources>
     </build>
   
   
@@ -300,7 +311,7 @@
 <dependency>
     <groupId>org.lucee</groupId>
     <artifactId>lucee</artifactId>
-    <version>6.1.1.118</version>
+    <version>7.0.0.211-BETA</version>
     <scope>provided</scope>
 </dependency>
 

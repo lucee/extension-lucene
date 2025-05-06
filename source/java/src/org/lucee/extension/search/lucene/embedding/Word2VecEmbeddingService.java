@@ -3,15 +3,13 @@ package org.lucee.extension.search.lucene.embedding;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import lucee.commons.io.res.Resource;
+import lucee.commons.io.res.filter.ResourceNameFilter;
 import lucee.loader.util.Util;
 import lucee.runtime.config.Config;
 import lucee.runtime.exp.PageException;
@@ -25,6 +23,14 @@ public class Word2VecEmbeddingService extends EmbeddingServiceSupport {
 	private Map<String, float[]> wordVectors;
 	private int dimension;
 
+	// https://nlp.stanford.edu/data/glove.6B.zip
+	// https://nlp.stanford.edu/data/glove.42B.300d.zip
+	// https://nlp.stanford.edu/data/glove.840B.300d.zip
+	// https://nlp.stanford.edu/data/glove.840B.300d.zip
+	// https://nlp.stanford.edu/data/glove.twitter.27B.zip
+
+	// glove.6B.300d glove.6B.50d glove.6B.200d glove.6B.100d
+
 	@Override
 	public void init(Config config, Struct parameters) throws IOException {
 		super.init(config, parameters);
@@ -34,14 +40,41 @@ public class Word2VecEmbeddingService extends EmbeddingServiceSupport {
 		}
 
 		String strVectorsFile = eng.getCastUtil().toString(parameters.get("vectorsFile", null), null);
-		if (Util.isEmpty(strVectorsFile)) {
-			throw new IOException("vector file is required for Word2VecEmbeddingService");
-		}
-		Resource vectorsFile;
-		try {
-			vectorsFile = eng.getResourceUtil().toResourceExisting(eng.getThreadPageContext(), strVectorsFile);
-		} catch (PageException e) {
-			throw eng.getExceptionUtil().toIOException(e);
+		// strVectorsFile =
+		// "/Users/mic/Test/test-cfconfig/lucee-server/context/search/embedding/glove.6B.100d.txt";
+
+		Resource vectorsResource = null;
+		if (Util.isEmpty(strVectorsFile, true)) {
+			Resource vectorsResourceDir = config.getConfigDir().getRealResource("search/embedding/");
+			Resource[] children = vectorsResourceDir.listResources(new ResourceNameFilter() {
+
+				@Override
+				public boolean accept(Resource parent, String name) {
+					return name.endsWith(".txt");
+				}
+			});
+			if (children != null) {
+				for (Resource c : children) {
+					if (vectorsResource == null || vectorsResource.length() < c.length())
+						vectorsResource = c;
+				}
+			}
+			if (vectorsResource == null) {
+				throw new IOException("Word2Vec embedding service error: No vector files found. "
+						+ "To use this service, you need to provide pre-trained word embedding vectors. "
+						+ "Options to resolve this issue: "
+						+ "1. Download pre-trained GloVe vectors from: https://nlp.stanford.edu/projects/glove/ "
+						+ "2. Place the extracted .txt files in: lucee-server/context/search/embedding/ ");
+				// + "3. Alternatively, specify a direct path to vectors using the 'vectorsFile'
+				// parameter");
+			}
+
+		} else {
+			try {
+				vectorsResource = eng.getResourceUtil().toResourceExisting(eng.getThreadPageContext(), strVectorsFile);
+			} catch (PageException e) {
+				throw eng.getExceptionUtil().toIOException(e);
+			}
 		}
 
 		this.wordVectors = new HashMap<>();
@@ -49,7 +82,7 @@ public class Word2VecEmbeddingService extends EmbeddingServiceSupport {
 		int dims = 0;
 
 		try (BufferedReader reader = (BufferedReader) eng.getIOUtil()
-				.toBufferedReader(new InputStreamReader(vectorsFile.getInputStream(), charset))) {
+				.toBufferedReader(new InputStreamReader(vectorsResource.getInputStream(), charset))) {
 			String line;
 			while ((line = reader.readLine()) != null) {
 				String[] parts = line.trim().split("\\s+");
@@ -125,24 +158,6 @@ public class Word2VecEmbeddingService extends EmbeddingServiceSupport {
 		}
 
 		return (float) (dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2)));
-	}
-
-	/**
-	 * Download a small pre-trained GloVe model for quick start.
-	 */
-	public static Path downloadGloveIfNeeded() throws IOException {
-		String userHome = System.getProperty("user.home");
-		Path embeddingsDir = Paths.get(userHome, ".word-embeddings");
-		Path glovePath = embeddingsDir.resolve("glove.6B.50d.txt");
-
-		if (!Files.exists(glovePath)) {
-			Files.createDirectories(embeddingsDir);
-			throw new IOException(
-					"Pre-trained embeddings not found. You should download them manually. For GloVe embeddings, visit: https://nlp.stanford.edu/projects/glove/. Expected location: "
-							+ glovePath);
-		}
-
-		return glovePath;
 	}
 
 	/**

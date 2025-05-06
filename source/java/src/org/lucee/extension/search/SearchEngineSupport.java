@@ -1,19 +1,13 @@
 package org.lucee.extension.search;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
-import javax.xml.transform.stream.StreamResult;
-
+import org.lucee.extension.search.lucene.util.CommonUtil;
 import org.lucee.extension.search.lucene.util.XMLUtil;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
 
 import lucee.commons.io.res.Resource;
 import lucee.commons.io.res.ResourceProvider;
@@ -26,60 +20,147 @@ import lucee.runtime.search.SearchCollection;
 import lucee.runtime.search.SearchEngine;
 import lucee.runtime.search.SearchException;
 import lucee.runtime.search.SearchIndex;
+import lucee.runtime.type.Array;
+import lucee.runtime.type.Collection;
 import lucee.runtime.type.Collection.Key;
 import lucee.runtime.type.Query;
 import lucee.runtime.type.Struct;
 import lucee.runtime.type.dt.DateTime;
+import lucee.runtime.util.Cast;
 
 /**
  * 
  */
 public abstract class SearchEngineSupport implements SearchEngine {
 
-	private static final String DEFAULT_SEARCH_XML = "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?>\n<search>\n</search>";
-
 	private Resource searchFile;
 	private Resource searchDir;
-	private Document doc;
-	final Struct collections;
+	final Map<String, SearchCollection> collections;
 	protected Config config;
 	private CFMLEngine engine;
+	private Struct root;
 
 	public SearchEngineSupport() {
 		engine = CFMLEngineFactory.getInstance();
-		collections = engine.getCreationUtil().createStruct();
+		collections = new ConcurrentHashMap<>();
 	}
 
 	@Override
 	public void init(lucee.runtime.config.Config config, Resource searchDir) throws IOException, SearchException {
 		this.config = config;
 		this.searchDir = searchDir;
-		this.searchFile = searchDir.getRealResource("search.xml");
-		if (!searchFile.exists() || searchFile.length() == 0)
-			createSearchFile(searchFile);
-		// DOMParser parserq = new DOMParser();
-		InputStream is = null;
-		try {
-			is = engine.getIOUtil().toBufferedInputStream(searchFile.getInputStream());
-			InputSource source = new InputSource(is);
-			// parser.parse(source);
-			doc = XMLUtil.parse(source, null, false);
 
-		} catch (PageException e) {
-			throw new SearchException(e);
-		} finally {
-			engine.getIOUtil().closeSilent(is);
+		this.searchFile = searchDir.getRealResource("search.json");
+
+		// no json
+		if (!searchFile.exists() || searchFile.length() == 0) {
+
+			// do we have xml?
+			Resource searchFileXML = searchDir.getRealResource("search.xml");
+			if (searchFileXML.exists() && searchFileXML.length() > 0) {
+				root = XMLUtil.importXML(config, searchFileXML);
+			} else {
+				root = engine.getCreationUtil().createStruct();
+			}
+			store(false);
+		} else {
+			try {
+				root = engine.getCastUtil()
+						.fromJsonStringToStruct(engine.getIOUtil().toString(searchFile, CommonUtil.UTF8));
+			} catch (PageException e) {
+				throw CommonUtil.toSearchException(e);
+			}
 		}
-		// doc = parser.getDocument();
+		try {
+			readCollections(config, root);
+		} catch (PageException e) {
+			throw CommonUtil.toSearchException(e);
+		}
+	}
 
-		readCollections(config);
+	private void readCollections(Config config, Struct root) throws SearchException, PageException {
+		Array arrColl = engine.getCastUtil().toArray(root.get("collections", null), null);
+		if (arrColl != null) {
+			Iterator<Object> it = arrColl.valueIterator();
+			Struct sctColl;
+			while (it.hasNext()) {
+				sctColl = engine.getCastUtil().toStruct(it.next(), null);
+
+				if (sctColl != null) {
+					readCollection(config, sctColl);
+				}
+			}
+		}
+	}
+
+	private final void readCollection(Config config, Struct sctColl) throws SearchException, PageException {
+		SearchCollection sc;
+		Cast cast = engine.getCastUtil();
+		DateTime last = cast.toDateTime(sctColl.get("lastUpdate", null), engine.getThreadTimeZone(), null);
+		if (last == null) {
+			last = engine.getCreationUtil().now();
+		}
+
+		DateTime cre = cast.toDateTime(sctColl.get("created", null), engine.getThreadTimeZone(), null);
+		if (cre == null) {
+			cre = engine.getCreationUtil().now();
+		}
+
+		ResourceProvider frp = engine.getResourceUtil().getFileResourceProvider();
+
+		sc = _readCollection(
+
+				cast.toString(sctColl.get("name")),
+
+				frp.getResource(cast.toString(sctColl.get("path"))),
+
+				cast.toString(sctColl.get("language", null), null),
+
+				last, cre,
+
+				cast.toString(sctColl.get("mode", null), null),
+
+				cast.toString(sctColl.get("embedding", null), null),
+
+				cast.toDoubleValue(sctColl.get("ratio", null), 0.5D)
+
+		);
+		collections.put(sc.getName().toLowerCase(), sc);
+
+		// Indexes
+		Array arrIdx = engine.getCastUtil().toArray(sctColl.get("indexes", null), null);
+		if (arrIdx != null && arrIdx.size() > 0) {
+			Iterator<Object> it = arrIdx.valueIterator();
+			Struct sctIdx;
+			while (it.hasNext()) {
+				sctIdx = cast.toStruct(it.next(), null);
+				if (sctIdx != null) {
+					readIndex(sc, sctIdx);
+				}
+			}
+		}
+	}
+
+	protected void readIndex(SearchCollection sc, Struct el) throws SearchException {
+		// Index
+		SearchIndex si = new SearchIndexImpl(sc, _attr(el, "id"), _attr(el, "title"), _attr(el, "key"),
+				SearchIndexImpl.toType(_attr(el, "type")), _attr(el, "query"),
+				engine.getListUtil().toStringArray(_attr(el, "extensions"), ","), _attr(el, "language"),
+				_attr(el, "urlpath"), _attr(el, "categoryTree"),
+				engine.getListUtil().toStringArray(_attr(el, "category"), ","), _attr(el, "custom1"),
+				_attr(el, "custom2"), _attr(el, "custom3"), _attr(el, "custom4"));
+		sc.addIndex(si);
+	}
+
+	private String _attr(Struct sctIdx, String attr) {
+		return engine.getStringUtil().emptyIfNull(engine.getCastUtil().toString(sctIdx.get(attr, null), null));
 	}
 
 	@Override
 	public final SearchCollection getCollectionByName(String name) throws SearchException {
-		Object o = collections.get(name.toLowerCase(), null);
-		if (o != null)
-			return (SearchCollection) o;
+		SearchCollection sc = collections.get(name.toLowerCase());
+		if (sc != null)
+			return sc;
 		throw new SearchException("collection " + name + " is undefined");
 	}
 
@@ -88,9 +169,9 @@ public abstract class SearchEngineSupport implements SearchEngine {
 		final String v = "VARCHAR";
 		Query query = null;
 		String[] cols = new String[] { "external", "language", "mapped", "name", "online", "path", "registered",
-				"lastmodified", "categories", "charset", "created", "size", "doccount" };
+				"lastmodified", "categories", "charset", "created", "size", "doccount", "mode", "embedding", "ratio" };
 		String[] types = new String[] { "BOOLEAN", v, "BOOLEAN", v, "BOOLEAN", v, v, "DATE", "BOOLEAN", v, "OBJECT",
-				"DOUBLE", "DOUBLE" };
+				"DOUBLE", "DOUBLE", v };
 		try {
 			query = engine.getCreationUtil().createQuery(cols, types, collections.size(), "query");
 		} catch (PageException e) {
@@ -98,12 +179,11 @@ public abstract class SearchEngineSupport implements SearchEngine {
 		}
 
 		// Collection.Key[] keys = collections.keys();
-		Iterator<Object> it = collections.valueIterator();
 		int i = -1;
-		while (it.hasNext()) {
+		SearchCollectionSupport scs;
+		for (SearchCollection coll : collections.values()) {
 			i++;
 			try {
-				SearchCollection coll = (SearchCollection) it.next();
 				query.setAt("external", i + 1, Boolean.FALSE);
 				query.setAt("charset", i + 1, "UTF-8");
 				query.setAt("created", i + 1, coll.created());
@@ -118,6 +198,14 @@ public abstract class SearchEngineSupport implements SearchEngine {
 				query.setAt("lastmodified", i + 1, coll.getLastUpdate());
 				query.setAt("size", i + 1, Double.valueOf(coll.getSize()));
 				query.setAt("doccount", i + 1, Double.valueOf(coll.getDocumentCount()));
+
+				if (coll instanceof SearchCollectionSupport) {
+					scs = (SearchCollectionSupport) coll;
+					query.setAt("mode", i + 1, scs.getMode());
+					query.setAt("embedding", i + 1, scs.getEmbedding());
+					query.setAt("ratio", i + 1, scs.getRatio());
+				}
+
 			} catch (PageException pe) {
 			}
 		}
@@ -127,16 +215,16 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	@Override
 	public final SearchCollection createCollection(String name, Resource path, String language, boolean allowOverwrite)
 			throws SearchException {
-		SearchCollection coll = _createCollection(name, path, language, null);
+		SearchCollection coll = _createCollection(name, path, language, null, null, 0.5D);
 		coll.create();
 		addCollection(coll, allowOverwrite);
 		return coll;
 	}
 
 	// FUTURE add to interface
-	public final SearchCollection createCollection(String name, Resource path, String language, String embedding,
-			boolean allowOverwrite) throws SearchException {
-		SearchCollection coll = _createCollection(name, path, language, embedding);
+	public final SearchCollection createCollection(String name, Resource path, String language, String mode,
+			String embedding, double ratio, boolean allowOverwrite) throws SearchException {
+		SearchCollection coll = _createCollection(name, path, language, mode, embedding, ratio);
 		coll.create();
 		addCollection(coll, allowOverwrite);
 		return coll;
@@ -154,8 +242,8 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 * @return New SearchCollection
 	 * @throws SearchException
 	 */
-	protected abstract SearchCollection _createCollection(String name, Resource path, String language, String embedding)
-			throws SearchException;
+	protected abstract SearchCollection _createCollection(String name, Resource path, String language, String mode,
+			String embedding, double ratio) throws SearchException;
 
 	/**
 	 * adds a new Collection to the storage
@@ -165,22 +253,28 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 *            if allowOverwrite is false and a collection already exist -> throw
 	 *            Exception
 	 * @throws SearchException
+	 * @throws IOException
 	 */
 	private final synchronized void addCollection(SearchCollection collection, boolean allowOverwrite)
 			throws SearchException {
-		Object o = collections.get(collection.getName(), null);
+		SearchCollection o = collections.get(collection.getName());
 		if (!allowOverwrite && o != null)
 			throw new SearchException("there is already a collection with name " + collection.getName());
-		collections.setEL(collection.getName(), collection);
+		collections.put(collection.getName().toLowerCase(), collection);
 		// update
 		if (o != null) {
-			setAttributes(getCollectionElement(collection.getName()), collection);
+			setAttributes(getCollectionStruct(collection.getName()), collection);
 		}
 		// create
 		else {
-			doc.getDocumentElement().appendChild(toElement(collection));
+			Array arrColl = engine.getCastUtil().toArray(root.get("collections", null), null);
+			if (arrColl == null) {
+				arrColl = engine.getCreationUtil().createArray();
+				root.setEL("collections", arrColl);
+			}
+			arrColl.appendEL(toStruct(collection));
 		}
-		store();
+		store(true);
 	}
 
 	/**
@@ -193,6 +287,31 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	protected final synchronized void removeCollection(SearchCollection collection) throws SearchException {
 		removeCollection(collection.getName());
 		_removeCollection(collection);
+	}
+
+	public Struct removeIndexStruct(Struct sctColl, String id) {
+		Array arrIdx = engine.getCastUtil().toArray(sctColl.get("indexes", null), null);
+		if (id == null || arrIdx == null)
+			return null;
+
+		Struct sctIdx;
+		Iterator<Entry<Key, Object>> it = arrIdx.entryIterator();
+		Entry<Key, Object> e;
+		Collection.Key key = null;
+		while (it.hasNext()) {
+			e = it.next();
+			sctIdx = engine.getCastUtil().toStruct(e.getValue(), null);
+			if (sctIdx != null) {
+				if (id.equals(engine.getCastUtil().toString(sctIdx.get("id", null), null))) {
+					key = e.getKey();
+					break;
+				}
+			}
+		}
+		if (key != null) {
+			arrIdx.remove(key, null);
+		}
+		return null;
 	}
 
 	/**
@@ -211,11 +330,34 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 *            Name of the Collection to remove
 	 * @throws SearchException
 	 */
-	private final synchronized void removeCollection(String name) throws SearchException {
+	protected final void removeCollection(String name) throws SearchException {
 		try {
-			collections.remove(engine.getCastUtil().toKey(name));
-			doc.getDocumentElement().removeChild(getCollectionElement(name));
-			store();
+			// remove collection itself
+			collections.remove(name.toLowerCase());
+
+			Array arrColl = engine.getCastUtil().toArray(root.get("collections", null), null);
+			if (name != null && arrColl != null) {
+
+				Struct sctColl;
+				Iterator<Entry<Key, Object>> it = arrColl.entryIterator();
+				Entry<Key, Object> e;
+				Collection.Key index = null;
+				while (it.hasNext()) {
+					e = it.next();
+					sctColl = engine.getCastUtil().toStruct(e.getValue(), null);
+					if (sctColl != null) {
+						if (name.equalsIgnoreCase(engine.getCastUtil().toString(sctColl.get("name", null), null))) {
+							index = e.getKey();
+							break;
+						}
+					}
+				}
+				if (index != null) {
+					arrColl.remove(index);
+				}
+
+			}
+			store(true);
 		} catch (PageException e) {
 			throw new SearchException("can't remove collection " + name + ", collection doesn't exist");
 		}
@@ -227,9 +369,9 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 * @param collection
 	 *            Collection to purge
 	 * @throws SearchException
+	 * @throws IOException
 	 */
 	protected final synchronized void purgeCollection(SearchCollection collection) throws SearchException {
-
 		purgeCollection(collection.getName());
 	}
 
@@ -239,20 +381,12 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 * @param name
 	 *            Name of the Collection to purge
 	 * @throws SearchException
+	 * @throws IOException
 	 */
 	private final synchronized void purgeCollection(String name) throws SearchException {
-
-		// Map map=(Map)collections.get(name);
-		// if(map!=null)map.clear();
-		Element parent = getCollectionElement(name);
-		NodeList list = parent.getChildNodes();
-		int len = list.getLength();
-		for (int i = len - 1; i >= 0; i--) {
-			parent.removeChild(list.item(i));
-		}
-		// doc.getDocumentElement().removeChild(getCollectionElement(name));
-		store();
-
+		Struct sctColl = getCollectionStruct(name);
+		sctColl.remove("indexes", null);
+		store(true);
 	}
 
 	@Override
@@ -261,80 +395,88 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	}
 
 	/**
-	 * return XML Element matching collection name
+	 * return Struct matching collection name
 	 * 
 	 * @param name
-	 * @return matching XML Element
+	 * @return matching collection struct
 	 */
-	protected final Element getCollectionElement(String name) {
-		Element root = doc.getDocumentElement();
-		NodeList children = root.getChildNodes();
-		int len = children.getLength();
-		for (int i = 0; i < len; i++) {
-			Node n = children.item(i);
-			if (n instanceof Element && n.getNodeName().equals("collection")) {
-				Element el = (Element) n;
-				if (el.getAttribute("name").equalsIgnoreCase(name))
-					return el;
+	protected final Struct getCollectionStruct(String name) {
+		Array arrColl = engine.getCastUtil().toArray(root.get("collections", null), null);
+		if (name == null || arrColl == null)
+			return null;
+
+		Struct sctColl;
+		Iterator<Object> it = arrColl.valueIterator();
+		while (it.hasNext()) {
+			sctColl = engine.getCastUtil().toStruct(it.next(), null);
+
+			if (sctColl != null) {
+				if (name.equalsIgnoreCase(engine.getCastUtil().toString(sctColl.get("name", null), null))) {
+					return sctColl;
+				}
 			}
 		}
 		return null;
 	}
 
-	public Element getIndexElement(Element collElement, String id) {
-		NodeList children = collElement.getChildNodes();
-		int len = children.getLength();
-		for (int i = 0; i < len; i++) {
-			Node n = children.item(i);
-			if (n instanceof Element && n.getNodeName().equals("index")) {
-				Element el = (Element) n;
-				if (el.getAttribute("id").equals(id))
-					return el;
+	public Struct getIndexStruct(Struct sctColl, String id) {
+		Array arrIdx = engine.getCastUtil().toArray(sctColl.get("indexes", null), null);
+		if (id == null || arrIdx == null)
+			return null;
+
+		Struct sctIdx;
+		Iterator<Object> it = arrIdx.valueIterator();
+		while (it.hasNext()) {
+			sctIdx = engine.getCastUtil().toStruct(it.next(), null);
+			if (sctIdx != null) {
+				if (id.equals(engine.getCastUtil().toString(sctIdx.get("id", null), null)))
+					return sctIdx;
 			}
 		}
 		return null;
 	}
 
 	/**
-	 * translate a collection object to a XML Element
-	 * 
-	 * @param coll
-	 *            Collection to translate
-	 * @return XML Element
+	 * translate a collection object to a struct
 	 */
-	private final Element toElement(SearchCollection coll) {
-		Element el = doc.createElement("collection");
-		setAttributes(el, coll);
-		return el;
+	private final Struct toStruct(SearchCollection coll) {
+		Struct sctColl = engine.getCreationUtil().createStruct();
+		setAttributes(sctColl, coll);
+		return sctColl;
 	}
 
 	/**
-	 * translate a collection object to a XML Element
-	 * 
-	 * @param index
-	 *            Index to translate
-	 * @return XML Element
-	 * @throws SearchException
+	 * translate a index object to a struct
 	 */
-	protected final Element toElement(SearchIndex index) throws SearchException {
-		Element el = doc.createElement("index");
-		setAttributes(el, index);
-		return el;
+	protected final Struct toStruct(SearchIndex index) throws SearchException {
+		Struct sctIdx = engine.getCreationUtil().createStruct();
+		setAttributes(sctIdx, index);
+		return sctIdx;
 	}
 
 	/**
-	 * sets all attributes in XML Element from Search Collection
+	 * sets all attributes from Search Collection
 	 * 
 	 * @param el
 	 * @param coll
 	 */
-	private final void setAttributes(Element el, SearchCollection coll) {
+	private final void setAttributes(Struct el, SearchCollection coll) {
 		if (el == null)
 			return;
+
 		setAttribute(el, "language", coll.getLanguage());
 		setAttribute(el, "name", coll.getName());
-		if (coll instanceof SearchCollectionSupport && !Util.isEmpty(((SearchCollectionSupport) coll).getEmbedding())) {
-			setAttribute(el, "embedding", ((SearchCollectionSupport) coll).getEmbedding());
+
+		if (coll instanceof SearchCollectionSupport) {
+			if (!Util.isEmpty(((SearchCollectionSupport) coll).getMode())) {
+				setAttribute(el, "mode", ((SearchCollectionSupport) coll).getMode());
+			}
+			if (!Util.isEmpty(((SearchCollectionSupport) coll).getEmbedding())) {
+				setAttribute(el, "embedding", ((SearchCollectionSupport) coll).getEmbedding());
+			}
+			setAttribute(el, "ratio", CFMLEngineFactory.getInstance().getCastUtil()
+					.toString(((SearchCollectionSupport) coll).getRatio(), "0.5"));
+
 		}
 		String value = coll.getLastUpdate().castToString(null);
 		if (value != null)
@@ -347,13 +489,13 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	}
 
 	/**
-	 * sets all attributes in XML Element from Search Index
+	 * sets all attributes in struct from Search Index
 	 * 
 	 * @param el
 	 * @param index
 	 * @throws SearchException
 	 */
-	protected final void setAttributes(Element el, SearchIndex index) throws SearchException {
+	protected final void setAttributes(Struct el, SearchIndex index) throws SearchException {
 		if (el == null)
 			return;
 		setAttribute(el, "categoryTree", index.getCategoryTree());
@@ -379,67 +521,10 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 * @param name
 	 * @param value
 	 */
-	private void setAttribute(Element el, String name, String value) {
-		if (value != null)
-			el.setAttribute(name, value);
-	}
-
-	/**
-	 * read in collections
-	 * 
-	 * @param config
-	 * @throws SearchException
-	 */
-	private void readCollections(Config config) throws SearchException {
-		Element root = doc.getDocumentElement();
-		NodeList children = root.getChildNodes();
-		int len = children.getLength();
-		for (int i = 0; i < len; i++) {
-			Node n = children.item(i);
-			if (n instanceof Element && n.getNodeName().equals("collection")) {
-				readCollection(config, (Element) n);
-			}
+	private void setAttribute(Struct el, String name, String value) {
+		if (value != null) {
+			el.setEL(name, value);
 		}
-	}
-
-	/**
-	 * read in a single collection element
-	 * 
-	 * @param config
-	 * @param el
-	 * @throws SearchException
-	 */
-	private final void readCollection(Config config, Element el) throws SearchException {
-		SearchCollection sc;
-		DateTime last = engine.getCastUtil().toDateTime(el.getAttribute("lastUpdate"), engine.getThreadTimeZone(),
-				null);
-		if (last == null) {
-			last = engine.getCreationUtil().now();
-		}
-
-		DateTime cre = engine.getCastUtil().toDateTime(el.getAttribute("created"), engine.getThreadTimeZone(), null);
-		if (cre == null) {
-			cre = engine.getCreationUtil().now();
-		}
-
-		ResourceProvider frp = engine.getResourceUtil().getFileResourceProvider();
-
-		sc = _readCollection(el.getAttribute("name"), frp.getResource(el.getAttribute("path")),
-				el.getAttribute("language"), last, cre, el.getAttribute("embedding"));
-		collections.setEL((sc.getName()), sc);
-
-		// Indexes
-		NodeList children = el.getChildNodes();
-		int len = children.getLength();
-		for (int i = 0; i < len; i++) {
-			Node n = children.item(i);
-			if (n instanceof Element && n.getNodeName().equals("index")) {
-				readIndex(sc, (Element) n);
-			}
-		}
-		/*
-		 * } catch (PageException e) { throw new SearchException(e); }
-		 */
 	}
 
 	/**
@@ -450,20 +535,6 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 * @throws SearchException
 	 * @throws PageException
 	 */
-	protected void readIndex(SearchCollection sc, Element el) throws SearchException {
-		// Index
-		SearchIndex si = new SearchIndexImpl(_attr(el, "id"), _attr(el, "title"), _attr(el, "key"),
-				SearchIndexImpl.toType(_attr(el, "type")), _attr(el, "query"),
-				engine.getListUtil().toStringArray(_attr(el, "extensions"), ","), _attr(el, "language"),
-				_attr(el, "urlpath"), _attr(el, "categoryTree"),
-				engine.getListUtil().toStringArray(_attr(el, "category"), ","), _attr(el, "custom1"),
-				_attr(el, "custom2"), _attr(el, "custom3"), _attr(el, "custom4"));
-		sc.addIndex(si);
-	}
-
-	private String _attr(Element el, String attr) {
-		return engine.getStringUtil().emptyIfNull(el.getAttribute(attr));
-	}
 
 	/**
 	 * read in a existing collection
@@ -478,54 +549,30 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	 * @throws SearchException
 	 */
 	protected abstract SearchCollection _readCollection(String name, Resource parh, String language,
-			DateTime lastUpdate, DateTime created, String embedding) throws SearchException;
+			DateTime lastUpdate, DateTime created, String mode, String embedding, double ratio) throws SearchException;
 
 	/**
 	 * store loaded data to xml file
 	 * 
 	 * @throws SearchException
-	 */
-	protected final synchronized void store() throws SearchException {
-		// Collection.Key[] keys=collections.keys();
-		Iterator<Key> it = collections.keyIterator();
-		Key k;
-		while (it.hasNext()) {
-			k = it.next();
-			Element collEl = getCollectionElement(k.getString());
-			SearchCollection sc = getCollectionByName(k.getString());
-			setAttributes(collEl, sc);
-		}
-
-		// OutputFormat format = new OutputFormat(doc, null, true);
-		// format.setLineSeparator("\r\n");
-		// format.setLineWidth(72);
-		OutputStream os = null;
-		try {
-			os = engine.getIOUtil().toBufferedOutputStream(searchFile.getOutputStream());
-			StreamResult result = new StreamResult(os);
-			XMLUtil.writeTo(doc.getDocumentElement(), result, false, true, null, null, null);
-			// XMLSerializer serializer = new XMLSerializer(os, format);
-			// serializer.serialize(doc.getDocumentElement());
-		} catch (Exception e) {
-			throw new SearchException(e);
-		} finally {
-			engine.getIOUtil().closeSilent(os);
-		}
-	}
-
-	/**
-	 * if no search xml exist create a empty one
-	 * 
-	 * @param searchFile
 	 * @throws IOException
 	 */
-	private final static void createSearchFile(Resource searchFile) throws IOException {
-		CFMLEngine e = CFMLEngineFactory.getInstance();
-		if (searchFile.isFile())
-			searchFile.createFile(true);
-		InputStream in = new ByteArrayInputStream(DEFAULT_SEARCH_XML.getBytes());
-		// e.getClass().getResourceAsStream("/resource/search/default.xml");
-		e.getIOUtil().copy(in, searchFile, true);
+	protected final synchronized void store(boolean updateData) throws SearchException {
+		if (updateData) {
+			SearchCollection sc;
+			for (Entry<String, SearchCollection> e : collections.entrySet()) {
+				Struct sctColl = getCollectionStruct(e.getKey().toLowerCase());
+				sc = e.getValue();
+				setAttributes(sctColl, sc);
+			}
+		}
+		try {
+			String raw = engine.getCastUtil().fromStructToJsonString(root, false);
+			engine.getIOUtil().write(searchFile, raw, false, CommonUtil.UTF8);
+
+		} catch (Exception e) {
+			throw CommonUtil.toSearchException(e);
+		}
 	}
 
 	@Override
@@ -534,4 +581,5 @@ public abstract class SearchEngineSupport implements SearchEngine {
 	public Config getConfig() {
 		return config;
 	}
+
 }

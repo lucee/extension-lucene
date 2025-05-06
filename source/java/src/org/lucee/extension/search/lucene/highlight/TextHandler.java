@@ -37,13 +37,10 @@ public class TextHandler {
 		PriorityQueue<ScoredParagraph> bestParagraphs = new PriorityQueue<>();
 		// Score each paragraph
 
-		System.err.println("-------- " + texts.size() + " ----------");
-
 		for (int i = 0; i < texts.size(); i++) {
 			paragraphFormatter.reset();
 			// Get highlighted text and score for this paragraph
 			Text original = texts.get(i);
-			System.err.println("-- " + original.length());
 			String highlighted = highlighter.getBestFragment(analyzer, "content", original.text);
 			if (highlighted == null)
 				highlighted = original.text;
@@ -68,12 +65,12 @@ public class TextHandler {
 
 	// Helper class to store paragraph information
 	public static class ScoredParagraph implements Comparable<ScoredParagraph> {
-		Text original;
-		String highlighted;
-		float score;
-		int originalIndex;
+		public final Text original;
+		public final String highlighted;
+		public final float score;
+		public final int originalIndex;
 
-		ScoredParagraph(Text original, String highlighted, float score, int originalIndex) {
+		public ScoredParagraph(Text original, String highlighted, float score, int originalIndex) {
 			this.original = original;
 			this.highlighted = highlighted;
 			this.score = score;
