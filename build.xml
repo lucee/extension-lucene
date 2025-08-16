@@ -36,6 +36,9 @@
     <target name="maven-build">
         <exec dir="source/java" executable="mvn" failonerror="true">
             <arg line="clean ${maven.goal} -Dgpg.skip=true -Drevision=${bundleversion} --settings maven-settings.xml"/>
+            <env key="MAVEN_USERNAME" value="${maven.username}"/>
+            <env key="MAVEN_PASSWORD" value="${maven.password}"/>
+            <env key="GPG_PASSPHRASE" value="${gpg.passphrase}"/>
         </exec>
         
         <!-- Now copy dependencies -->
@@ -46,6 +49,8 @@
             <arg value="-DexcludeScope=provided"/>
             <arg value="-Drevision=${bundleversion}"/>
             <arg value="dependency:copy-dependencies"/>
+            <env key="MAVEN_USERNAME" value="${maven.username}"/>
+            <env key="MAVEN_PASSWORD" value="${maven.password}"/>
         </exec>
         <!--
 mvn clean -Dmdep.copyPom=true -Drevision=3.0.0.0-ALPHA -Dmdep.useRepositoryLayout=true -DexcludeScope=provided -DoutputDirectory=/Users/mic/tmp9/xxx  dependency:copy-dependencies
