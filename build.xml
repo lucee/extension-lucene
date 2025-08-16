@@ -35,7 +35,7 @@
 
     <target name="maven-build">
         <exec dir="source/java" executable="mvn" failonerror="true">
-            <arg line="clean ${maven.goal} -Drevision=${bundleversion} --settings maven-settings.xml"/>
+            <arg line="clean ${maven.goal} -Dgpg.skip=true -Drevision=${bundleversion} --settings maven-settings.xml"/>
         </exec>
         
         <!-- Now copy dependencies -->
