@@ -67,7 +67,7 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "------- Maven Install -------";
-          mvn -B -e -f pom.xml clean deploy -DperformRelease=true -Dgoal=deploy --settings maven-settings.xml
+          mvn -B -e -f pom.xml clean install -DperformRelease=true -Dgoal=install --settings maven-settings.xml
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
