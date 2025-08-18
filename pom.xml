@@ -126,6 +126,9 @@
                         <configuration>
                             <target>
                                 <ant antfile="build.xml" target="clean">
+                                    <echo>DEBUG: MAVEN_USERNAME = ${MAVEN_USERNAME}</echo>
+                                    <echo>DEBUG: goal = ${goal}</echo>
+
                                     <property name="bundleversion" value="${project.version}"/>
                                     <property name="bundlename" value="${bundlename}"/>
                                     <property name="filename" value="${project.artifactId}"/>
