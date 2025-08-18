@@ -37,6 +37,7 @@
 
         <echo>-->${maven.goal}</echo>
         <echo>-->${maven.username}</echo>
+        <echo>-->${maven.username2}</echo>
         <echo>-->${bundleversion}</echo>
 
         <exec dir="source/java" executable="mvn" failonerror="true">
