@@ -96,13 +96,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [setup, build-and-test]
-    if: always() && needs.build-and-test.result == 'success'
+    if: always() ## && needs.build-and-test.result == 'success'
     steps:
       - name: Debug job results
         run: |
           echo "setup result: ${{ needs.setup.result }}"
           echo "build-and-test result: ${{ needs.build-and-test.result }}"
-          echo "condition would be: ${{ always() && needs.build-and-test.result == 'success' }}"
           
       - name: Checkout repository
         if: needs.build-and-test.result == 'success'  # Move condition here
