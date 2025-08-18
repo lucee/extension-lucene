@@ -33,17 +33,14 @@
         <mkdir dir="${dist}/"/>
     </target>
 
-    <target name="maven-build">
+    <target name="maven-build">        
 
+        <echo>-->${maven.goal}</echo>
         <echo>-->${maven.username}</echo>
         <echo>-->${bundleversion}</echo>
 
         <exec dir="source/java" executable="mvn" failonerror="true">
-            <arg line="clean ${maven.goal} -Drevision=${bundleversion} --settings maven-settings.xml"/>
-
-            <env key="SUB_MAVEN_USERNAME" value="${maven.username}"/>
-            <env key="SUB_MAVEN_PASSWORD" value="${maven.password}"/>
-            <env key="SUB_GPG_PASSPHRASE" value="${gpg.passphrase}"/>
+            <arg line="clean ${maven.goal} -Drevision=${bundleversion}"/>
         </exec>
         
         <!-- Now copy dependencies -->
