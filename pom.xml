@@ -138,10 +138,9 @@
                                     <property name="camelname" value="${camelname}"/>
                                     <property name="maven.goal" value="${goal}"/>
 
-                                    <property name="maven.username" value="${systemProperty.MU}"/>
-                                    <property name="maven.username2" value="${env.MAVEN_USERNAME}"/>
-                                    <property name="maven.password" value="${systemProperty.MP}"/>
-                                    <property name="gpg.passphrase" value="${systemProperty.GP}"/>
+                                    <property name="maven.username" value="${env.MAVEN_USERNAME}"/>
+                                    <property name="maven.password" value="${env.MAVEN_PASSWORD}"/>
+                                    <property name="gpg.passphrase" value="${env.GPG_PASSPHRASE}"/>
                                 </ant>
                                 <condition property="isSnapshot" value="true" else="false">
                                     <matches string="${project.version}" pattern=".*-SNAPSHOT"/>
@@ -158,10 +157,6 @@
                               <propertySets>
                                 <propertySet>
                                   <propertyRef prefix="env."/>
-                                  <propertyRef name="MU"/>
-                                  <propertyRef name="MU2"/>
-                                  <propertyRef name="MP"/>
-                                  <propertyRef name="GP"/>
                                 </propertySet>
                               </propertySets>
 

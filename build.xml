@@ -37,19 +37,17 @@
 
         <echo>-->${maven.goal}</echo>
         <echo>-->${maven.username}</echo>
-        <echo>-->${maven.username2}</echo>
-        <echo>-->${bundleversion}</echo>
-
+        
         <exec dir="source/java" executable="mvn" failonerror="true">
             <arg value="clean"/>
             <arg value="${maven.goal}"/>
             <arg value="-Drevision=${bundleversion}"/>
             <arg value="--settings"/>
             <arg value="maven-settings.xml"/>
-            <!-- Add credentials as system properties
+            <!-- Add credentials as system properties -->
             <arg value="-Dmaven.username=${maven.username}"/>
             <arg value="-Dmaven.password=${maven.password}"/>
-             -->
+            <arg value="-Dgpg.passphrase=${gpg.passphrase}"/>
         </exec>
 
         <!-- Now copy dependencies -->

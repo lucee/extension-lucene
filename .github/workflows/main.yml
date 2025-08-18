@@ -116,7 +116,15 @@ jobs:
           echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-
+      - name: Debug env
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+        run: |
+          if [[ -z "${MAVEN_USERNAME}" ]]; then echo "MAVEN_USERNAME is empty"; exit 1; fi
+          echo "::add-mask::${MAVEN_USERNAME}"   # ensure masking
+          echo "MAVEN_USERNAME (masked): ${MAVEN_USERNAME}"
+          echo "MAVEN_USERNAME length: ${#MAVEN_USERNAME}"
+          printf "MAVEN_USERNAME sha256: %s\n" "$(printf %s "$MAVEN_USERNAME" | sha256sum | cut -d' ' -f1)"
       - name: Build and Deploy with Maven
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
