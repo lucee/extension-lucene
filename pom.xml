@@ -155,8 +155,16 @@
                                 <echo message="Deploying to URL: ${deploy.url}" />
                             </target>
                             <exportAntProperties>true</exportAntProperties>
-                            <inheritAll>true</inheritAll>
-                            <inheritRefs>true</inheritRefs>
+                              <propertySets>
+                                <propertySet>
+                                  <propertyRef prefix="env."/>
+                                  <propertyRef name="MU"/>
+                                  <propertyRef name="MU2"/>
+                                  <propertyRef name="MP"/>
+                                  <propertyRef name="GP"/>
+                                </propertySet>
+                              </propertySets>
+
                         </configuration>
                     </execution>
                 </executions>
