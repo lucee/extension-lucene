@@ -34,10 +34,6 @@
     </target>
 
     <target name="maven-build">        
-
-        <echo>-->${maven.goal}</echo>
-        <echo>-->${maven.username}</echo>
-        
         <exec dir="source/java" executable="mvn" failonerror="true">
             <arg value="clean"/>
             <arg value="${maven.goal}"/>

@@ -63,7 +63,7 @@ jobs:
       - name: Build and Install with Maven (for testing only)
         run: |
           echo "------- Maven Install (to create a local test build) -------";
-          mvn -B -e -f pom.xml clean install -DperformRelease=true -Dgoal=install
+          mvn -B -e -f pom.xml clean install -Dgoal=install
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
