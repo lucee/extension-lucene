@@ -155,6 +155,8 @@
                                 <echo message="Deploying to URL: ${deploy.url}" />
                             </target>
                             <exportAntProperties>true</exportAntProperties>
+                            <inheritAll>true</inheritAll>
+                            <inheritRefs>true</inheritRefs>
                         </configuration>
                     </execution>
                 </executions>
