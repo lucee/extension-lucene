@@ -60,14 +60,10 @@ jobs:
           java-version: '11'
           distribution: 'adopt'
 
-      - name: Build and Install with Maven
-        env:
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Build and Install with Maven (for testing only)
         run: |
-          echo "------- Maven Install -------";
-          mvn -B -e -f pom.xml clean install -DperformRelease=true -Dgoal=install --settings maven-settings.xml
+          echo "------- Maven Install (to create a local test build) -------";
+          mvn -B -e -f pom.xml clean install -DperformRelease=true -Dgoal=install
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
