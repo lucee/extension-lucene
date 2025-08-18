@@ -67,7 +67,7 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "------- Maven Install -------";
-          mvn -B -e -f pom.xml clean deploy -Dgoal=deploy -Dgpg.skip=true --settings maven-settings.xml
+          mvn -B -e -f pom.xml clean deploy -DperformRelease=true -Dgoal=deploy --settings maven-settings.xml
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -137,7 +137,7 @@ jobs:
         run: |
           if [[ "${{ needs.setup.outputs.version }}" == *-SNAPSHOT ]]; then
             echo "------- Maven Deploy snapshot on ${{ github.event_name }} -------";
-            mvn -B -e -f pom.xml clean deploy -Dgoal=deploy -Dgpg.skip=true --settings maven-settings.xml
+            mvn -B -e -f pom.xml clean deploy -Dgoal=deploy -DperformRelease=true --settings maven-settings.xml
           else
             echo "------- Maven Deploy release on ${{ github.event_name }} -------";
             mvn -B -e -f pom.xml clean deploy -Dgoal=deploy -DperformRelease=true --settings maven-settings.xml
