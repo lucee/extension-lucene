@@ -73,6 +73,10 @@
             <exclude name="*-javadoc.jar"/>
         </fileset>
     </copy>
+
+    <!-- Copy POM from source location -->
+    <copy file="source/java/pom.xml" tofile="${dist}/extension/maven/lucene-search-${bundleversion}.pom"/>
+    
     <!-- Ensure the target directory exists -->
     <mkdir dir="${dist}/extension/maven/org/lucee/lucene-search/${bundleversion}/" />
     
