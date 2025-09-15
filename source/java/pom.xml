@@ -58,21 +58,46 @@
         </plugin>
 
 
-         	
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>oss</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        
          	<!-- Add source jar generation -->
-<plugin>
-    <groupId>org.apache.maven.plugins</groupId>
-    <artifactId>maven-source-plugin</artifactId>
-    <version>3.3.0</version>
-    <executions>
-        <execution>
-            <id>attach-sources</id>
-            <goals>
-                <goal>jar-no-fork</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
         <!-- Add javadoc jar generation -->
         <plugin>
@@ -313,11 +338,11 @@
                   <goals>
                     <goal>sign</goal>
                   </goals>
-                  <configuration>
+                  <!-- <configuration>
                     <files>
                       <file>${project.build.directory}/${project.artifactId}-${project.version}.lex</file>
                     </files>
-                  </configuration>
+                  </configuration> -->
                 </execution>
               </executions>
             </plugin>

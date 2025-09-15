@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.lucee</groupId>
     <artifactId>lucene-search-extension</artifactId>
-    <version>3.0.0.163-SNAPSHOT</version>
+    <version>3.0.0.162-RC</version>
     <packaging>pom</packaging>
     <name>Lucene Search Engine</name>
 
@@ -15,6 +15,7 @@
         <id>EFDEB172-F52E-4D84-9CD1A1F561B3DFC8</id>
         <bundlename>lucene.search.extension</bundlename>
         <mvnGroupId>org.lucee</mvnGroupId>
+        <mvnGroupPath>org/lucee</mvnGroupPath>
         <mvnArtifactId>lucene-search</mvnArtifactId>
         <mvnVersion>3.0.0.60-ALPHA</mvnVersion>
         <filename>lucene-search-extension</filename>
@@ -137,6 +138,9 @@
                                     <property name="class" value="${class}"/>
                                     <property name="camelname" value="${camelname}"/>
                                     <property name="maven.goal" value="${goal}"/>
+                                    <property name="mvnGroupId" value="${mvnGroupId}"/>
+                                    <property name="mvnGroupPath" value="${mvnGroupPath}"/>
+                                    <property name="mvnArtifactId" value="${mvnArtifactId}"/>
 
                                     <property name="maven.username" value="${env.MAVEN_USERNAME}"/>
                                     <property name="maven.password" value="${env.MAVEN_PASSWORD}"/>
