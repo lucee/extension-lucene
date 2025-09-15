@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Set environment variables
-export MAVEN_USERNAME="KVwNruCc"
-export MAVEN_PASSWORD="5vSGq/+AD0CQJo3UXByCOYXPp2IupcWaqX1vJPMSK0NM"
-export GPG_PASSPHRASE="Susi Sorglos"
+export MAVEN_USERNAME="..."
+export MAVEN_PASSWORD="..."
+export GPG_PASSPHRASE="..."
 
 
 # Set the directory containing the Maven project
