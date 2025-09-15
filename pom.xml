@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.lucee</groupId>
     <artifactId>lucene-search-extension</artifactId>
-    <version>3.0.0.162-RC</version>
+    <version>3.0.0.163</version>
     <packaging>pom</packaging>
     <name>Lucene Search Engine</name>
 
