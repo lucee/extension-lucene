@@ -132,7 +132,7 @@ jobs:
           luceeVersion: ${{ matrix.lucee }}
           extensionDir: ${{ github.workspace }}/target
         env:
-          testLabels: lucene
+          testLabels: search
           testAdditional: ${{ github.workspace }}/tests
           LUCEE_LOGGING_FORCE_APPENDER: console
           LUCEE_LOGGING_FORCE_LEVEL: INFO
