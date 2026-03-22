@@ -7,6 +7,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.lucee.extension.search.lucene.util.CommonUtil;
+import org.lucee.extension.search.lucene.util.JsonUtil;
 import org.lucee.extension.search.lucene.util.XMLUtil;
 
 import lucee.commons.io.res.Resource;
@@ -65,8 +66,7 @@ public abstract class SearchEngineSupport implements SearchEngine {
 			store(false);
 		} else {
 			try {
-				root = engine.getCastUtil()
-						.fromJsonStringToStruct(engine.getIOUtil().toString(searchFile, CommonUtil.UTF8));
+				root = JsonUtil.deserialize(engine, engine.getIOUtil().toString(searchFile, CommonUtil.UTF8));
 			} catch (PageException e) {
 				throw CommonUtil.toSearchException(e);
 			}
@@ -567,7 +567,7 @@ public abstract class SearchEngineSupport implements SearchEngine {
 			}
 		}
 		try {
-			String raw = engine.getCastUtil().fromStructToJsonString(root, false);
+			String raw = JsonUtil.serialize(engine, root);
 			engine.getIOUtil().write(searchFile, raw, false, CommonUtil.UTF8);
 
 		} catch (Exception e) {

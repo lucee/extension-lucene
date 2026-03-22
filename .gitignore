@@ -15,3 +15,7 @@ target/*
 *.DS_Store
 *.cfc.hbm.xml
 /cache
+/test-output
+/.claude
+/.vscode
+test.bat
