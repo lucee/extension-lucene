@@ -1213,21 +1213,26 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 	public static EmbeddingService createEmbeddingService(Config config, String embedding, String language)
 			throws IOException {
+
 		EmbeddingService embeddingService;
+		Struct params = CFMLEngineFactory.getInstance().getCreationUtil().createStruct();
+		params.setEL("language", language);
+
 		if (EMBEDDING_TF_IDF.equalsIgnoreCase(embedding)) {
 			embeddingService = new TfIdfEmbeddingService();
 		} else if (EMBEDDING_WORD2VEC.equalsIgnoreCase(embedding)) {
 			embeddingService = new Word2VecEmbeddingService();
+		} else if (embedding.indexOf('/') >= 0 || embedding.indexOf('\\') >= 0) {
+			// file path to vectors file — use word2vec service with explicit path
+			embeddingService = new Word2VecEmbeddingService();
+			params.setEL("vectorsFile", embedding);
 		}
 		// TODO allow bundle defintion and Maven
 		else {
 			embeddingService = (EmbeddingService) CFMLEngineFactory.getInstance().getClassUtil()
 					.loadInstance(embedding);
-
 		}
 
-		Struct params = CFMLEngineFactory.getInstance().getCreationUtil().createStruct();
-		params.setEL("language", language);
 		embeddingService.init(config, params);
 
 		return embeddingService;
