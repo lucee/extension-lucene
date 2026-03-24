@@ -19,3 +19,4 @@ target/*
 /.claude
 /.vscode
 test.bat
+.flattened-pom.xml
