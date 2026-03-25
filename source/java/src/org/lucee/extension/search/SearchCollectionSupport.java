@@ -373,7 +373,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 	public final IndexResult indexCustom(String id, QueryColumn title, QueryColumn keyColumn, QueryColumn[] bodyColumns,
 			String language, QueryColumn urlPath, QueryColumn custom1, QueryColumn custom2, QueryColumn custom3,
 			QueryColumn custom4) throws SearchException {
-		IndexResult ir = _indexCustom(id, title, keyColumn, bodyColumns, language, null, custom1, custom2, custom3,
+		IndexResult ir = _indexCustom(id, title, keyColumn, bodyColumns, language, urlPath, custom1, custom2, custom3,
 				custom4);
 		changeLastUpdate();
 		return ir;
