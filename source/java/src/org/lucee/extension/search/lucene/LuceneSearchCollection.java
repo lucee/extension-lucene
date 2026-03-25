@@ -28,6 +28,7 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.MultiReader;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
@@ -667,7 +668,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				if ("*".equals(criteria)) {
 					query = new MatchAllDocsQuery();
 				} else {
-					query = new QueryParser("contents", analyzer).parse(criteria);
+					query = new MultiFieldQueryParser(new String[] { "contents", "filename" }, analyzer).parse(criteria);
 					formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
 				}
 			}
@@ -697,7 +698,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 						if (mode == MODE_HYBRID) {
 
-							Query keywordQuery = new QueryParser("contents", analyzer).parse(criteria);
+							Query keywordQuery = new MultiFieldQueryParser(new String[] { "contents", "filename" }, analyzer).parse(criteria);
 							// Combine queries for hybrid search
 							BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
 							BoostQuery boostedKeywordQuery = new BoostQuery(keywordQuery, keywordWeight);
@@ -721,7 +722,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				}
 
 				else {
-					query = new QueryParser("contents", analyzer).parse(criteria);
+					query = new MultiFieldQueryParser(new String[] { "contents", "filename" }, analyzer).parse(criteria);
 				}
 
 				formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
