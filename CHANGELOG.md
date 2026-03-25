@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.0.166
+
+- [LDEV-6194](https://luceeserver.atlassian.net/browse/LDEV-6194) — fix NPE on `criteria="*"`, guard topN for empty results, escape special chars in Verity parser
+- [LDEV-6193](https://luceeserver.atlassian.net/browse/LDEV-6193) — `type="explicit"` enables native Lucene QueryParser syntax
+- [LDEV-2025](https://luceeserver.atlassian.net/browse/LDEV-2025) — fix special characters in search criteria
+- [LDEV-1745](https://luceeserver.atlassian.net/browse/LDEV-1745) — fix phrase queries with `+`/`-` modifiers, fix numHits error
+- Add test cases for [LDEV-1879](https://luceeserver.atlassian.net/browse/LDEV-1879), [LDEV-3310](https://luceeserver.atlassian.net/browse/LDEV-3310), [LDEV-2025](https://luceeserver.atlassian.net/browse/LDEV-2025), [LDEV-1166](https://luceeserver.atlassian.net/browse/LDEV-1166), [LDEV-1550](https://luceeserver.atlassian.net/browse/LDEV-1550), [LDEV-1023](https://luceeserver.atlassian.net/browse/LDEV-1023), [LDEV-2032](https://luceeserver.atlassian.net/browse/LDEV-2032)
+
 ## 3.0.0.165
 
 - [LDEV-6182](https://luceeserver.atlassian.net/browse/LDEV-6182) — fix Lucee 6.2 compatibility

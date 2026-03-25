@@ -34,6 +34,7 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
+import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
@@ -626,9 +627,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	public SearchResulItem[] _search(SearchData data, String criteria, String language, short type, final int startrow,
 			final int maxrow, String categoryTree, String[] category) throws SearchException {
 		try {
-			if (type != SEARCH_TYPE_SIMPLE)
-				throw new SearchException("search type explicit not supported");
-
 			Analyzer analyzer = SearchUtil.getAnalyzer(language);
 			Query query = null;
 			Op op = null;
@@ -663,15 +661,30 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			}
 
 			HTMLFormatterWithScore formatter = null;
-			if (!criteria.equals("*")) {
+
+			// type="explicit" — native Lucene QueryParser syntax, bypass Verity parser
+			if (type == SEARCH_TYPE_EXPLICIT) {
+				if ("*".equals(criteria)) {
+					query = new MatchAllDocsQuery();
+				} else {
+					query = new QueryParser("contents", analyzer).parse(criteria);
+					formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
+				}
+			}
+			// type="simple" (default) — Verity-compatible parser
+			else if ("*".equals(criteria)) {
+				query = new MatchAllDocsQuery();
+			} else {
 				op = queryParser.parseOp(criteria);
 				if (op == null)
 					criteria = "*";
 				else
 					criteria = op.toString();
+			}
 
+			if (query == null && !"*".equals(criteria)) {
 				// Add vector search if enabled and service is available
-				if (getEmbeddingService() != null && !criteria.equals("*")) {
+				if (getEmbeddingService() != null) {
 					try {
 						// Generate embedding for query
 						float[] queryVector = getEmbeddingService().generate(criteria);
@@ -784,8 +797,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 						}
 					} else {
 						// Normal search
-						TopDocs topDocs = searcher.search(query,
-								maxrow > -1 ? Math.min(startrow + maxrow, reader.numDocs()) : reader.numDocs());
+						int topN = maxrow > -1 ? Math.min(startrow + maxrow, reader.numDocs()) : reader.numDocs();
+						topN = Math.max(1, topN);
+						TopDocs topDocs = searcher.search(query, topN);
 						ScoreDoc[] scoreDocs = topDocs.scoreDocs;
 
 						if (mode == MODE_VECTOR) {

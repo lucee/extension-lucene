@@ -1,4 +1,4 @@
-component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" skip=true {
+component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 	function beforeAll(){
 		variables.uri = createURI("LDEV1745");
 	}
