@@ -275,41 +275,18 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		}
 	}
 
-	private void indexSpellCheckOld(String id) throws SearchException {
-		if (!spellcheck)
-			return;
-
-		IndexReader reader = null;
-		FSDirectory spellDir = null;
-
-		Resource dir = _createSpellDirectory(id);
-		try {
-			Path spellPath = engine.getCastUtil().toFile(dir).toPath();
-			spellDir = FSDirectory.open(spellPath);
-			reader = _getReader(id, false);
-			Dictionary dictionary = new LuceneDictionary(reader, "contents");
-
-			SpellChecker spellChecker = new SpellChecker(spellDir);
-			spellChecker.indexDictionary(dictionary, _getConfig(), true);
-
-		} catch (Exception e) {
-			throw CommonUtil.toSearchException(e);
-		} finally {
-			closeEL(reader);
-		}
-	}
-
 	private void indexSpellCheck(String id) throws SearchException {
 		if (!spellcheck)
 			return;
 
 		IndexReader reader = null;
 		FSDirectory spellDir = null;
+		SpellChecker spellChecker = null;
 
 		Resource dir = _createSpellDirectory(id);
 		try {
 			spellDir = FSDirectory.open(engine.getCastUtil().toFile(dir).toPath());
-			SpellChecker spellChecker = new SpellChecker(spellDir);
+			spellChecker = new SpellChecker(spellDir);
 
 			reader = _getReader(id, false);
 			Dictionary dictionary = new LuceneDictionary(reader, "contents");
@@ -319,9 +296,10 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		} catch (Exception e) {
 			throw CommonUtil.toSearchException(e);
 		} finally {
+			if (spellChecker != null) try { spellChecker.close(); } catch (Exception e) {}
+			if (spellDir != null) try { spellDir.close(); } catch (Exception e) {}
 			closeEL(reader);
 		}
-
 	}
 
 	private void close(IndexWriter writer) throws SearchException {
@@ -848,8 +826,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				}
 			}
 
-			// spellcheck
-			if (spellcheck && data != null && data.getSuggestionMax() >= list.size()) {
+			// spellcheck — skip when type=explicit (no Verity parser terms to check)
+			if (spellcheck && data != null && data.getSuggestionMax() >= list.size()
+					&& type != SEARCH_TYPE_EXPLICIT) {
 				Map<String, SuggestionItem> suggestions = data.getSuggestion();
 				Iterator<String> it = spellCheckIndex.iterator();
 				String id;
@@ -860,19 +839,37 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				while (it.hasNext()) {
 					id = it.next();
 					SuggestionItemImpl si;
-					SpellChecker sc = getSpellChecker(id);
+					SpellChecker sc = null;
+					FSDirectory siDir = null;
+					try {
+						siDir = FSDirectory.open(engine.getCastUtil().toFile(_getSpellDirectory(id)).toPath());
+						sc = new SpellChecker(siDir);
 
-					for (int i = 0; i < strLiterals.length; i++) {
-						String[] arr = sc.suggestSimilar(strLiterals[i], 1000);
-						if (arr.length > 0) {
-							literals[i].set("<suggestion>" + arr[0] + "</suggestion>");
-							setSuggestionQuery = true;
-							si = (SuggestionItemImpl) suggestions.get(strLiterals[i]);
-							if (si == null)
-								suggestions.put(strLiterals[i], new SuggestionItemImpl(arr));
-							else
-								si.add(arr);
+						for (int i = 0; i < strLiterals.length; i++) {
+							int maxSuggestions = Math.min(data.getSuggestionMax(), 10);
+							String[] arr = sc.suggestSimilar(strLiterals[i], maxSuggestions);
+							if (arr.length > 0) {
+								literals[i].setSuggestion(arr[0]);
+								setSuggestionQuery = true;
+
+								// compute real Lucene string distance scores
+								double[] scores = new double[arr.length];
+								for (int j = 0; j < arr.length; j++) {
+									scores[j] = sc.getStringDistance().getDistance(strLiterals[i], arr[j]);
+								}
+
+								si = (SuggestionItemImpl) suggestions.get(strLiterals[i]);
+								if (si == null)
+									suggestions.put(strLiterals[i], new SuggestionItemImpl(arr, scores));
+								else
+									si.add(arr, scores);
+							}
 						}
+					} catch (Exception e) {
+						error(e);
+					} finally {
+						if (sc != null) try { sc.close(); } catch (Exception e) {}
+						if (siDir != null) try { siDir.close(); } catch (Exception e) {}
 					}
 				}
 				if (setSuggestionQuery) {
@@ -888,11 +885,10 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			// remove start rows
 			if (startrow > 1) {
 				int start = startrow;
-				while (start > 1) {
+				while (start > 1 && !list.isEmpty()) {
 					list.remove(0);
 					start--;
 				}
-				// list.remove(start)
 			}
 
 			// remove max rows
@@ -906,12 +902,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		} catch (Exception e) {
 			throw CommonUtil.toSearchException(e);
 		}
-	}
-
-	private SpellChecker getSpellChecker(String id) throws IOException, PageException {
-		FSDirectory siDir = FSDirectory.open(engine.getCastUtil().toFile(_getSpellDirectory(id)).toPath());
-		SpellChecker spellChecker = new SpellChecker(siDir);
-		return spellChecker;
 	}
 
 	private boolean removeCorrupt(Resource dir) {
@@ -1127,7 +1117,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		// return true;
 		// if(StringUtil.isEmpty(categoryTreeSearch) || categoryTreeSearch.equals("/"))
 		// return true;
-		return categoryTreeIndex.startsWith(categoryTreeSearch);
+		return categoryTreeIndex.equals(categoryTreeSearch)
+				|| categoryTreeIndex.startsWith(categoryTreeSearch + "/")
+				|| "/".equals(categoryTreeSearch);
 	}
 
 	/**
@@ -1354,7 +1346,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			try {
 				writers[i] = _getWriter(files[i].getName(), create);
 			} catch (IOException e) {
+				error(e);
 			} catch (PageException e) {
+				error(new SearchException(e.getMessage()));
 			}
 		}
 		return writers;
@@ -1530,7 +1524,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	}
 
 	private void error(Exception e) {
-		e.printStackTrace();
 		if (log == null) {
 			e.printStackTrace();
 			return;

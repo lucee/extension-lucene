@@ -171,7 +171,7 @@ public abstract class SearchEngineSupport implements SearchEngine {
 		String[] cols = new String[] { "external", "language", "mapped", "name", "online", "path", "registered",
 				"lastmodified", "categories", "charset", "created", "size", "doccount", "mode", "embedding", "ratio" };
 		String[] types = new String[] { "BOOLEAN", v, "BOOLEAN", v, "BOOLEAN", v, v, "DATE", "BOOLEAN", v, "OBJECT",
-				"DOUBLE", "DOUBLE", v };
+				"DOUBLE", "DOUBLE", v, v, "DOUBLE" };
 		try {
 			query = engine.getCreationUtil().createQuery(cols, types, collections.size(), "query");
 		} catch (PageException e) {

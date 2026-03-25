@@ -10,6 +10,7 @@ public final class Literal implements Op {
 	String literal;
 	String modifier = "";
 	boolean quoted = false;
+	boolean hasSuggestion = false;
 
 	public Literal(String literal) {
 		this.literal=literal;
@@ -24,11 +25,14 @@ public final class Literal implements Op {
 	public String toString() {
 		if (quoted)
 			return modifier + "\"" + literal + "\"";
+		if (hasSuggestion)
+			return modifier + literal;
 		return modifier + escapeLuceneSpecialChars(literal);
 	}
 
-	public void set(String literal) {
-		this.literal=literal;
+	public void setSuggestion(String suggestion) {
+		this.literal = "<suggestion>" + suggestion + "</suggestion>";
+		this.hasSuggestion = true;
 	}
 
 	public void setModifier(String modifier) {
