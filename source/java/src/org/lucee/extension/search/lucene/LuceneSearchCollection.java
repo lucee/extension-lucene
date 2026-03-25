@@ -885,11 +885,10 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			// remove start rows
 			if (startrow > 1) {
 				int start = startrow;
-				while (start > 1) {
+				while (start > 1 && !list.isEmpty()) {
 					list.remove(0);
 					start--;
 				}
-				// list.remove(start)
 			}
 
 			// remove max rows
@@ -904,7 +903,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			throw CommonUtil.toSearchException(e);
 		}
 	}
-
 
 	private boolean removeCorrupt(Resource dir) {
 		if (engine.getResourceUtil().isEmptyFile(dir)) {
@@ -1119,7 +1117,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		// return true;
 		// if(StringUtil.isEmpty(categoryTreeSearch) || categoryTreeSearch.equals("/"))
 		// return true;
-		return categoryTreeIndex.startsWith(categoryTreeSearch);
+		return categoryTreeIndex.equals(categoryTreeSearch)
+				|| categoryTreeIndex.startsWith(categoryTreeSearch + "/")
+				|| "/".equals(categoryTreeSearch);
 	}
 
 	/**
@@ -1346,7 +1346,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			try {
 				writers[i] = _getWriter(files[i].getName(), create);
 			} catch (IOException e) {
+				error(e);
 			} catch (PageException e) {
+				error(new SearchException(e.getMessage()));
 			}
 		}
 		return writers;

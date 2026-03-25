@@ -85,6 +85,12 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 				expect( isQuery( res ) ).toBeTrue( "should still return a query object" );
 			});
 
+			it( title="startRow past end of results returns empty", body=function() {
+				search name="local.res" collection="searchFeatA" criteria="fox" language="English"
+					startRow=999 maxRows=10;
+				expect( res.recordcount ).toBe( 0, "startRow past results should return empty, not crash" );
+			});
+
 			it( title="context highlight markers", body=function() {
 				search
 					name="local.res"
