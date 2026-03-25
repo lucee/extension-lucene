@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0.168
+
+- [LDEV-6196](https://luceeserver.atlassian.net/browse/LDEV-6196) — fix `cfsearch` context highlighting markers not reaching extension (requires Lucee Loader 7.0.3.30+)
+
 ## 3.0.0.167
 
 - [LDEV-6195](https://luceeserver.atlassian.net/browse/LDEV-6195) — fix `cfindex action="delete"` not removing individual documents

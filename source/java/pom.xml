@@ -309,7 +309,7 @@
 		<dependency>
 		    <groupId>org.lucee</groupId>
 		    <artifactId>lucee</artifactId>
-		    <version>7.0.2.106</version>
+		    <version>7.0.3.30-SNAPSHOT</version>
 		    <scope>provided</scope>
 		    <classifier>zero</classifier>
 		</dependency>
