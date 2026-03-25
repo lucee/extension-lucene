@@ -41,11 +41,11 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 					action="delete"
 					collection="LDEV3310del";
 
-				// the index directory should be deletable (no locked files)
+				// verify the directory can be cleaned up (LDEV-3310: previously failed on Windows due to locked index files)
 				if ( DirectoryExists( path ) ) {
 					directoryDelete( path, true );
 				}
-				expect( DirectoryExists( path ) ).toBeFalse( "directory should be fully deleted without locked files" );
+				expect( DirectoryExists( path ) ).toBeFalse( "directory should be fully deleted after collection delete" );
 			});
 
 			it( title="collection delete followed by recreate works", body=function() {
