@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0.169
+
+- [LDEV-6198](https://luceeserver.atlassian.net/browse/LDEV-6198) — fix spellcheck/suggestions: real Lucene string distance scores (0-100), fix `</suggestion>` tag leak in suggestedQuery, fix resource leaks (SpellChecker/FSDirectory never closed), fix NPE with `type="explicit"`, remove dead code. `suggestions="always"` now returns max 10 suggestions per term (was 1000); `suggestions="5"` returns up to 5.
+
 ## 3.0.0.168
 
 - [LDEV-6196](https://luceeserver.atlassian.net/browse/LDEV-6196) — fix `cfsearch` context highlighting markers not reaching extension (requires Lucee Loader 7.0.3.30+)
