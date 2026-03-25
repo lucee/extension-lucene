@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.0.167
+
+- [LDEV-6195](https://luceeserver.atlassian.net/browse/LDEV-6195) — fix `cfindex action="delete"` not removing individual documents
+- [LDEV-6197](https://luceeserver.atlassian.net/browse/LDEV-6197) — make filenames searchable in path-type indexes
+
 ## 3.0.0.166
 
 - [LDEV-6194](https://luceeserver.atlassian.net/browse/LDEV-6194) — fix NPE on `criteria="*"`, guard topN for empty results, escape special chars in Verity parser
