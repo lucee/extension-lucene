@@ -90,7 +90,7 @@ jobs:
           mvn -B -e -f pom.xml clean install -Dgoal=install
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: lucene-lex
           path: target/*.lex
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Download Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: lucene-lex
           path: target
