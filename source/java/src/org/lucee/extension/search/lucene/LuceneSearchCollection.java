@@ -45,9 +45,9 @@ import org.apache.lucene.search.spell.Dictionary;
 import org.apache.lucene.search.spell.LuceneDictionary;
 import org.apache.lucene.search.spell.SpellChecker;
 import org.apache.lucene.store.FSDirectory;
+import org.lucee.extension.search.AddionalAttrsHelper;
 import org.lucee.extension.search.IndexResultImpl;
 import org.lucee.extension.search.SearchCollectionSupport;
-import org.lucee.extension.search.SearchDataImpl;
 import org.lucee.extension.search.SearchEngineSupport;
 import org.lucee.extension.search.SearchResulItemImpl;
 import org.lucee.extension.search.SuggestionItemImpl;
@@ -612,32 +612,12 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 			org.lucee.extension.search.lucene.query.QueryParser queryParser = new org.lucee.extension.search.lucene.query.QueryParser();
 
-			// addional attributes
-			int contextBytes = 1000;
-			int contextPassages = 3;
-			int contextPassageLength = 150;
-			String contextHighlightBegin = HTMLFormatterWithScore.DEFAULT_PRE_TAG;
-			String contextHighlightEnd = HTMLFormatterWithScore.DEFAULT_POST_TAG;
-
-			String tmp;
-
-			if (data instanceof SearchDataImpl) {
-				Cast cast = engine.getCastUtil();
-				Map<String, Object> attrs = ((SearchDataImpl) data).getAddionalAttributes();
-				if (attrs != null) {
-					contextBytes = cast.toIntValue(attrs.get("contextBytes"), contextBytes);
-					contextPassages = cast.toIntValue(attrs.get("contextPassages"), contextPassages);
-					contextPassageLength = cast.toIntValue(attrs.get("contextPassageLength"), contextPassageLength);
-
-					tmp = cast.toString(attrs.get("contextHighlightBegin"), null);
-					if (!Util.isEmpty(tmp, true))
-						contextHighlightBegin = tmp;
-					tmp = cast.toString(attrs.get("contextHighlightEnd"), null);
-					if (!Util.isEmpty(tmp, true))
-						contextHighlightEnd = tmp;
-
-				}
-			}
+			// addional attributes — read from core's AddionalAttrs thread-local via reflection
+			int contextBytes = AddionalAttrsHelper.getContextBytes(1000);
+			int contextPassages = AddionalAttrsHelper.getContextPassages(3);
+			int contextPassageLength = AddionalAttrsHelper.getContextPassageLength(150);
+			String contextHighlightBegin = AddionalAttrsHelper.getContextHighlightBegin(HTMLFormatterWithScore.DEFAULT_PRE_TAG);
+			String contextHighlightEnd = AddionalAttrsHelper.getContextHighlightEnd(HTMLFormatterWithScore.DEFAULT_POST_TAG);
 
 			HTMLFormatterWithScore formatter = null;
 

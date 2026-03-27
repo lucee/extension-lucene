@@ -3,6 +3,7 @@ package org.lucee.extension.search;
 import java.util.HashMap;
 import java.util.Map;
 
+
 import lucee.runtime.search.SearchData;
 
 // FUTURE diese klasse entfernen, dient nur daszu die suggestion durchzuschleusen
@@ -12,7 +13,6 @@ public class SearchDataImpl implements SearchData {
 	private int suggestionMax;
 	private String suggestionQuery;
 	private int recordsSearched;
-	private HashMap<String, Object> attrs;
 
 	public SearchDataImpl(int suggestionMax) {
 		this(new HashMap(), suggestionMax);
@@ -55,15 +55,5 @@ public class SearchDataImpl implements SearchData {
 	@Override
 	public int getRecordsSearched() {
 		return recordsSearched;
-	}
-
-	public void setAddionalAttribute(String name, Object value) {
-		if (attrs == null)
-			attrs = new HashMap<String, Object>();
-		attrs.put(name, value);
-	}
-
-	public Map<String, Object> getAddionalAttributes() {
-		return attrs;
 	}
 }
