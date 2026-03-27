@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0.170
+
+- [LDEV-6196](https://luceeserver.atlassian.net/browse/LDEV-6196) — rework context highlighting to use core's `AddionalAttrs` thread-local via reflection, removing `SearchDataPro` from the loader (requires Lucee 7.0.3.33+ or 6.2.6.11+)
+
 ## 3.0.0.169
 
 - [LDEV-6198](https://luceeserver.atlassian.net/browse/LDEV-6198) — fix spellcheck/suggestions: real Lucene string distance scores (0-100), fix `</suggestion>` tag leak in suggestedQuery, fix resource leaks (SpellChecker/FSDirectory never closed), fix NPE with `type="explicit"`, remove dead code. `suggestions="always"` now returns max 10 suggestions per term (was 1000); `suggestions="5"` returns up to 5.
