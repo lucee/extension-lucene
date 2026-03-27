@@ -62,7 +62,7 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 				}
 			});
 
-			it( title="custom non-HTML markers are applied correctly", body=function() {
+			it( title="custom non-HTML markers are applied correctly", skip=needsCoreFix(), body=function() {
 				var path = server._getTempDir( "ctx-custom-marker" );
 
 				if ( DirectoryExists( path ) ) {
@@ -177,7 +177,7 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 				}
 			});
 
-			it( title="contextBytes constrains total context length", body=function() {
+			it( title="contextBytes constrains total context length", skip=needsCoreFix(), body=function() {
 				var path = server._getTempDir( "ctx-bytes" );
 
 				if ( DirectoryExists( path ) ) {
@@ -240,7 +240,7 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 				}
 			});
 
-			it( title="contextPassages=0 returns empty context", body=function() {
+			it( title="contextPassages=0 returns empty context", skip=needsCoreFix(), body=function() {
 				var path = server._getTempDir( "ctx-zero-passages" );
 
 				if ( DirectoryExists( path ) ) {
@@ -293,7 +293,7 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 				}
 			});
 
-			it( title="highlighting works with type=explicit", body=function() {
+			it( title="highlighting works with type=explicit", skip=needsCoreFix(), body=function() {
 				var path = server._getTempDir( "ctx-explicit" );
 
 				if ( DirectoryExists( path ) ) {
@@ -353,7 +353,7 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 				}
 			});
 
-			it( title="multiple matched terms are all highlighted", body=function() {
+			it( title="multiple matched terms are all highlighted", skip=needsCoreFix(), body=function() {
 				var path = server._getTempDir( "ctx-multi-match" );
 
 				if ( DirectoryExists( path ) ) {
@@ -418,5 +418,18 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 				}
 			});
 		});
+	}
+
+	// core must have contextPassageLength in AddionalAttrs for custom markers to reach the extension
+	// first landed in 7.1.0.69, 7.0.3.33, 6.2.6.11 — version gating is fragile across future branches, so detect via reflection
+	private boolean function needsCoreFix() {
+		try {
+			var cl = createObject( "java", "java.lang.Thread" ).currentThread().getContextClassLoader();
+			var clazz = createObject( "java", "java.lang.Class" ).forName( "lucee.runtime.search.AddionalAttrs", true, cl );
+			clazz.getMethod( "getContextPassageLength", [] );
+			return false;
+		} catch ( any e ) {
+			return true;
+		}
 	}
 }

@@ -56,4 +56,8 @@ public class SearchDataImpl implements SearchData {
 	public int getRecordsSearched() {
 		return recordsSearched;
 	}
+
+	// kept so older Lucee cores that call this via MethodHandle reflection don't throw NoSuchMethodException
+	public void setAddionalAttribute(String name, Object value) {
+	}
 }
