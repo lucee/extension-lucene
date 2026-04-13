@@ -61,7 +61,10 @@
         <echo>artifactId:${mvnArtifactId}</echo>
         <echo>bundleversion:${bundleversion}</echo>
 
-         <exec dir="source/java" executable="mvn" failonerror="true">
+        <condition property="mvn.executable" value="mvn.cmd" else="mvn">
+            <os family="windows"/>
+        </condition>
+         <exec dir="source/java" executable="${mvn.executable}" failonerror="true">
             <arg value="clean"/>
             <arg value="${effective.goal}"/>
             <arg value="-Drevision=${bundleversion}"/>
@@ -80,7 +83,7 @@
             <echo message="Maven error: ${maven.error}"/>
 
         <!-- Now copy dependencies -->
-        <exec dir="source/java" executable="mvn" failonerror="true">
+        <exec dir="source/java" executable="${mvn.executable}" failonerror="true">
             <arg value="-DoutputDirectory=${temp}/dependency"/>
             <arg value="-Dmdep.copyPom=true"/>
             <arg value="-Dmdep.useRepositoryLayout=true"/>
@@ -90,7 +93,10 @@
         </exec>
 
         <!-- Copy parent POMs automatically -->
-        <exec executable="bash" failonerror="true">
+        <condition property="bash.executable" value="${env.ProgramFiles}\Git\usr\bin\bash.exe" else="bash">
+            <os family="windows"/>
+        </condition>
+        <exec executable="${bash.executable}" failonerror="true">
             <arg value="${basedir}/copy-parent-poms.sh"/>
             <arg value="${temp}/dependency"/>
         </exec>

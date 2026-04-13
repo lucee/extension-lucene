@@ -28,12 +28,14 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.MultiReader;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
+import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
@@ -43,9 +45,9 @@ import org.apache.lucene.search.spell.Dictionary;
 import org.apache.lucene.search.spell.LuceneDictionary;
 import org.apache.lucene.search.spell.SpellChecker;
 import org.apache.lucene.store.FSDirectory;
+import org.lucee.extension.search.AddionalAttrsHelper;
 import org.lucee.extension.search.IndexResultImpl;
 import org.lucee.extension.search.SearchCollectionSupport;
-import org.lucee.extension.search.SearchDataImpl;
 import org.lucee.extension.search.SearchEngineSupport;
 import org.lucee.extension.search.SearchResulItemImpl;
 import org.lucee.extension.search.SuggestionItemImpl;
@@ -273,41 +275,18 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		}
 	}
 
-	private void indexSpellCheckOld(String id) throws SearchException {
-		if (!spellcheck)
-			return;
-
-		IndexReader reader = null;
-		FSDirectory spellDir = null;
-
-		Resource dir = _createSpellDirectory(id);
-		try {
-			Path spellPath = engine.getCastUtil().toFile(dir).toPath();
-			spellDir = FSDirectory.open(spellPath);
-			reader = _getReader(id, false);
-			Dictionary dictionary = new LuceneDictionary(reader, "contents");
-
-			SpellChecker spellChecker = new SpellChecker(spellDir);
-			spellChecker.indexDictionary(dictionary, _getConfig(), true);
-
-		} catch (Exception e) {
-			throw CommonUtil.toSearchException(e);
-		} finally {
-			closeEL(reader);
-		}
-	}
-
 	private void indexSpellCheck(String id) throws SearchException {
 		if (!spellcheck)
 			return;
 
 		IndexReader reader = null;
 		FSDirectory spellDir = null;
+		SpellChecker spellChecker = null;
 
 		Resource dir = _createSpellDirectory(id);
 		try {
 			spellDir = FSDirectory.open(engine.getCastUtil().toFile(dir).toPath());
-			SpellChecker spellChecker = new SpellChecker(spellDir);
+			spellChecker = new SpellChecker(spellDir);
 
 			reader = _getReader(id, false);
 			Dictionary dictionary = new LuceneDictionary(reader, "contents");
@@ -317,9 +296,10 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		} catch (Exception e) {
 			throw CommonUtil.toSearchException(e);
 		} finally {
+			if (spellChecker != null) try { spellChecker.close(); } catch (Exception e) {}
+			if (spellDir != null) try { spellDir.close(); } catch (Exception e) {}
 			closeEL(reader);
 		}
-
 	}
 
 	private void close(IndexWriter writer) throws SearchException {
@@ -626,52 +606,44 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	public SearchResulItem[] _search(SearchData data, String criteria, String language, short type, final int startrow,
 			final int maxrow, String categoryTree, String[] category) throws SearchException {
 		try {
-			if (type != SEARCH_TYPE_SIMPLE)
-				throw new SearchException("search type explicit not supported");
-
 			Analyzer analyzer = SearchUtil.getAnalyzer(language);
 			Query query = null;
 			Op op = null;
 
 			org.lucee.extension.search.lucene.query.QueryParser queryParser = new org.lucee.extension.search.lucene.query.QueryParser();
 
-			// addional attributes
-			int contextBytes = 1000;
-			int contextPassages = 3;
-			int contextPassageLength = 150;
-			String contextHighlightBegin = HTMLFormatterWithScore.DEFAULT_PRE_TAG;
-			String contextHighlightEnd = HTMLFormatterWithScore.DEFAULT_POST_TAG;
-
-			String tmp;
-
-			if (data instanceof SearchDataImpl) {
-				Cast cast = engine.getCastUtil();
-				Map<String, Object> attrs = ((SearchDataImpl) data).getAddionalAttributes();
-				if (attrs != null) {
-					contextBytes = cast.toIntValue(attrs.get("contextBytes"), contextBytes);
-					contextPassages = cast.toIntValue(attrs.get("contextPassages"), contextPassages);
-					contextPassageLength = cast.toIntValue(attrs.get("contextPassageLength"), contextPassageLength);
-
-					tmp = cast.toString(attrs.get("contextHighlightBegin"), null);
-					if (!Util.isEmpty(tmp, true))
-						contextHighlightBegin = tmp;
-					tmp = cast.toString(attrs.get("contextHighlightEnd"), null);
-					if (!Util.isEmpty(tmp, true))
-						contextHighlightEnd = tmp;
-
-				}
-			}
+			// addional attributes — read from core's AddionalAttrs thread-local via reflection
+			int contextBytes = AddionalAttrsHelper.getContextBytes(1000);
+			int contextPassages = AddionalAttrsHelper.getContextPassages(3);
+			int contextPassageLength = AddionalAttrsHelper.getContextPassageLength(150);
+			String contextHighlightBegin = AddionalAttrsHelper.getContextHighlightBegin(HTMLFormatterWithScore.DEFAULT_PRE_TAG);
+			String contextHighlightEnd = AddionalAttrsHelper.getContextHighlightEnd(HTMLFormatterWithScore.DEFAULT_POST_TAG);
 
 			HTMLFormatterWithScore formatter = null;
-			if (!criteria.equals("*")) {
+
+			// type="explicit" — native Lucene QueryParser syntax, bypass Verity parser
+			if (type == SEARCH_TYPE_EXPLICIT) {
+				if ("*".equals(criteria)) {
+					query = new MatchAllDocsQuery();
+				} else {
+					query = new MultiFieldQueryParser(new String[] { "contents", "filename" }, analyzer).parse(criteria);
+					formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
+				}
+			}
+			// type="simple" (default) — Verity-compatible parser
+			else if ("*".equals(criteria)) {
+				query = new MatchAllDocsQuery();
+			} else {
 				op = queryParser.parseOp(criteria);
 				if (op == null)
 					criteria = "*";
 				else
 					criteria = op.toString();
+			}
 
+			if (query == null && !"*".equals(criteria)) {
 				// Add vector search if enabled and service is available
-				if (getEmbeddingService() != null && !criteria.equals("*")) {
+				if (getEmbeddingService() != null) {
 					try {
 						// Generate embedding for query
 						float[] queryVector = getEmbeddingService().generate(criteria);
@@ -684,7 +656,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 						if (mode == MODE_HYBRID) {
 
-							Query keywordQuery = new QueryParser("contents", analyzer).parse(criteria);
+							Query keywordQuery = new MultiFieldQueryParser(new String[] { "contents", "filename" }, analyzer).parse(criteria);
 							// Combine queries for hybrid search
 							BooleanQuery.Builder bqBuilder = new BooleanQuery.Builder();
 							BoostQuery boostedKeywordQuery = new BoostQuery(keywordQuery, keywordWeight);
@@ -708,7 +680,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				}
 
 				else {
-					query = new QueryParser("contents", analyzer).parse(criteria);
+					query = new MultiFieldQueryParser(new String[] { "contents", "filename" }, analyzer).parse(criteria);
 				}
 
 				formatter = new HTMLFormatterWithScore(contextHighlightBegin, contextHighlightEnd);
@@ -784,8 +756,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 						}
 					} else {
 						// Normal search
-						TopDocs topDocs = searcher.search(query,
-								maxrow > -1 ? Math.min(startrow + maxrow, reader.numDocs()) : reader.numDocs());
+						int topN = maxrow > -1 ? Math.min(startrow + maxrow, reader.numDocs()) : reader.numDocs();
+						topN = Math.max(1, topN);
+						TopDocs topDocs = searcher.search(query, topN);
 						ScoreDoc[] scoreDocs = topDocs.scoreDocs;
 
 						if (mode == MODE_VECTOR) {
@@ -833,8 +806,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				}
 			}
 
-			// spellcheck
-			if (spellcheck && data != null && data.getSuggestionMax() >= list.size()) {
+			// spellcheck — skip when type=explicit (no Verity parser terms to check)
+			if (spellcheck && data != null && data.getSuggestionMax() >= list.size()
+					&& type != SEARCH_TYPE_EXPLICIT) {
 				Map<String, SuggestionItem> suggestions = data.getSuggestion();
 				Iterator<String> it = spellCheckIndex.iterator();
 				String id;
@@ -845,19 +819,37 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				while (it.hasNext()) {
 					id = it.next();
 					SuggestionItemImpl si;
-					SpellChecker sc = getSpellChecker(id);
+					SpellChecker sc = null;
+					FSDirectory siDir = null;
+					try {
+						siDir = FSDirectory.open(engine.getCastUtil().toFile(_getSpellDirectory(id)).toPath());
+						sc = new SpellChecker(siDir);
 
-					for (int i = 0; i < strLiterals.length; i++) {
-						String[] arr = sc.suggestSimilar(strLiterals[i], 1000);
-						if (arr.length > 0) {
-							literals[i].set("<suggestion>" + arr[0] + "</suggestion>");
-							setSuggestionQuery = true;
-							si = (SuggestionItemImpl) suggestions.get(strLiterals[i]);
-							if (si == null)
-								suggestions.put(strLiterals[i], new SuggestionItemImpl(arr));
-							else
-								si.add(arr);
+						for (int i = 0; i < strLiterals.length; i++) {
+							int maxSuggestions = Math.min(data.getSuggestionMax(), 10);
+							String[] arr = sc.suggestSimilar(strLiterals[i], maxSuggestions);
+							if (arr.length > 0) {
+								literals[i].setSuggestion(arr[0]);
+								setSuggestionQuery = true;
+
+								// compute real Lucene string distance scores
+								double[] scores = new double[arr.length];
+								for (int j = 0; j < arr.length; j++) {
+									scores[j] = sc.getStringDistance().getDistance(strLiterals[i], arr[j]);
+								}
+
+								si = (SuggestionItemImpl) suggestions.get(strLiterals[i]);
+								if (si == null)
+									suggestions.put(strLiterals[i], new SuggestionItemImpl(arr, scores));
+								else
+									si.add(arr, scores);
+							}
 						}
+					} catch (Exception e) {
+						error(e);
+					} finally {
+						if (sc != null) try { sc.close(); } catch (Exception e) {}
+						if (siDir != null) try { siDir.close(); } catch (Exception e) {}
 					}
 				}
 				if (setSuggestionQuery) {
@@ -873,11 +865,10 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			// remove start rows
 			if (startrow > 1) {
 				int start = startrow;
-				while (start > 1) {
+				while (start > 1 && !list.isEmpty()) {
 					list.remove(0);
 					start--;
 				}
-				// list.remove(start)
 			}
 
 			// remove max rows
@@ -891,12 +882,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		} catch (Exception e) {
 			throw CommonUtil.toSearchException(e);
 		}
-	}
-
-	private SpellChecker getSpellChecker(String id) throws IOException, PageException {
-		FSDirectory siDir = FSDirectory.open(engine.getCastUtil().toFile(_getSpellDirectory(id)).toPath());
-		SpellChecker spellChecker = new SpellChecker(siDir);
-		return spellChecker;
 	}
 
 	private boolean removeCorrupt(Resource dir) {
@@ -1112,7 +1097,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		// return true;
 		// if(StringUtil.isEmpty(categoryTreeSearch) || categoryTreeSearch.equals("/"))
 		// return true;
-		return categoryTreeIndex.startsWith(categoryTreeSearch);
+		return categoryTreeIndex.equals(categoryTreeSearch)
+				|| categoryTreeIndex.startsWith(categoryTreeSearch + "/")
+				|| "/".equals(categoryTreeSearch);
 	}
 
 	/**
@@ -1213,21 +1200,26 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 	public static EmbeddingService createEmbeddingService(Config config, String embedding, String language)
 			throws IOException {
+
 		EmbeddingService embeddingService;
+		Struct params = CFMLEngineFactory.getInstance().getCreationUtil().createStruct();
+		params.setEL("language", language);
+
 		if (EMBEDDING_TF_IDF.equalsIgnoreCase(embedding)) {
 			embeddingService = new TfIdfEmbeddingService();
 		} else if (EMBEDDING_WORD2VEC.equalsIgnoreCase(embedding)) {
 			embeddingService = new Word2VecEmbeddingService();
+		} else if (embedding.indexOf('/') >= 0 || embedding.indexOf('\\') >= 0) {
+			// file path to vectors file — use word2vec service with explicit path
+			embeddingService = new Word2VecEmbeddingService();
+			params.setEL("vectorsFile", embedding);
 		}
 		// TODO allow bundle defintion and Maven
 		else {
 			embeddingService = (EmbeddingService) CFMLEngineFactory.getInstance().getClassUtil()
 					.loadInstance(embedding);
-
 		}
 
-		Struct params = CFMLEngineFactory.getInstance().getCreationUtil().createStruct();
-		params.setEL("language", language);
 		embeddingService.init(config, params);
 
 		return embeddingService;
@@ -1334,7 +1326,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			try {
 				writers[i] = _getWriter(files[i].getName(), create);
 			} catch (IOException e) {
+				error(e);
 			} catch (PageException e) {
+				error(new SearchException(e.getMessage()));
 			}
 		}
 		return writers;
@@ -1510,7 +1504,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	}
 
 	private void error(Exception e) {
-		e.printStackTrace();
 		if (log == null) {
 			e.printStackTrace();
 			return;

@@ -128,9 +128,22 @@ public final class QueryParser {
     
     private Op literal(ParserString ps) {
     	ps.removeSpace();
-    	
-    	if(ps.isCurrent(QUOTER)) return quotedLiteral(ps);
-    	return notQuotedLiteral(ps);
+
+    	// Handle +/- modifiers (Lucene MUST/MUST_NOT) — preserve as prefix on next term
+    	String modifier = "";
+    	if(ps.isValidIndex() && (ps.getCurrent() == '+' || ps.getCurrent() == '-')) {
+    		modifier = String.valueOf(ps.getCurrent());
+    		ps.next();
+    	}
+
+    	Op op;
+    	if(ps.isCurrent(QUOTER)) op = quotedLiteral(ps);
+    	else op = notQuotedLiteral(ps);
+
+    	if(!modifier.isEmpty() && op instanceof Literal) {
+    		((Literal)op).setModifier(modifier);
+    	}
+    	return op;
     }
  
 
@@ -151,9 +164,9 @@ public final class QueryParser {
 			ps.next();
 		}
 		
-		return register(new Literal(str.toString()));
+		return register(new Literal(str.toString(), true));
     }
- 
+
     private Op notQuotedLiteral(ParserString ps) {
     	
 		StringBuffer str=new StringBuffer();

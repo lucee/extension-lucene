@@ -11,7 +11,7 @@ import lucee.runtime.search.SearchException;
 import lucee.runtime.type.dt.DateTime;
 
 /**
- * 
+ *
  */
 public final class LuceneSearchEngine extends SearchEngineSupport {
 

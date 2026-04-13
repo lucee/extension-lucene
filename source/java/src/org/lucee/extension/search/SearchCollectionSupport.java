@@ -373,7 +373,7 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 	public final IndexResult indexCustom(String id, QueryColumn title, QueryColumn keyColumn, QueryColumn[] bodyColumns,
 			String language, QueryColumn urlPath, QueryColumn custom1, QueryColumn custom2, QueryColumn custom3,
 			QueryColumn custom4) throws SearchException {
-		IndexResult ir = _indexCustom(id, title, keyColumn, bodyColumns, language, null, custom1, custom2, custom3,
+		IndexResult ir = _indexCustom(id, title, keyColumn, bodyColumns, language, urlPath, custom1, custom2, custom3,
 				custom4);
 		changeLastUpdate();
 		return ir;
@@ -537,7 +537,17 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 				}
 
 				QueryColumn keyColumn = qv.getColumn(k);
-				return deleteCustom("custom", keyColumn);
+
+				// apply delete across all custom indexes — the index id is derived
+				// from the query variable name used at index time, which we don't
+				// know here, so we iterate all custom-type indexes
+				IndexResult ir = IndexResultImpl.EMPTY;
+				for (SearchIndex si : indexes.values()) {
+					if (si.getType() == SearchIndex.TYPE_CUSTOM) {
+						ir = deleteCustom(si.getId(), keyColumn);
+					}
+				}
+				return ir;
 			} catch (PageException pe) {
 				throw CommonUtil.toSearchException(pe);
 			}

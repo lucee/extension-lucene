@@ -81,6 +81,12 @@ public final class DocumentUtil {
 			doc.add(FieldUtil.UnIndexed("url", strPath));
 			doc.add(FieldUtil.UnIndexed("key", strPath));
 			doc.add(FieldUtil.UnIndexed("path", strPath));
+			// add filename from URL as searchable field
+			String urlPath = url.getPath();
+			if (urlPath != null && !urlPath.isEmpty()) {
+				String urlName = urlPath.substring(urlPath.lastIndexOf('/') + 1);
+				if (!urlName.isEmpty()) doc.add(FieldUtil.Text("filename", urlName));
+			}
 		}
 
 		return doc;
@@ -151,6 +157,14 @@ public final class DocumentUtil {
 		doc.add(FieldUtil.UnIndexed("url", strName));
 		doc.add(FieldUtil.UnIndexed("key", strPath));
 		doc.add(FieldUtil.UnIndexed("path", file.getPath()));
+		// add filename as searchable field so cfsearch can find files by name
+		String searchableName = strName.startsWith("/") ? strName.substring(1) : strName;
+		// index both with and without extension for maximum searchability
+		doc.add(FieldUtil.Text("filename", searchableName));
+		int dotPos = searchableName.lastIndexOf('.');
+		if (dotPos > 0) {
+			doc.add(FieldUtil.Text("filename", searchableName.substring(0, dotPos)));
+		}
 		doc.add(FieldUtil.UnIndexed("size", e.getCastUtil().toString(file.length())));
 		doc.add(new StringField("modified",
 				DateTools.timeToString(file.lastModified(), DateTools.Resolution.MILLISECOND), Field.Store.YES));

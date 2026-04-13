@@ -1,7 +1,11 @@
 #!/bin/bash
 
 DEPENDENCY_DIR="$1"
-M2_REPO="${HOME}/.m2/repository"
+M2_REPO="${M2_REPO:-${HOME}/.m2/repository}"
+# Windows: HOME may differ when invoked from Ant, fall back to USERPROFILE
+if [ ! -d "$M2_REPO" ] && [ -n "$USERPROFILE" ]; then
+    M2_REPO="$USERPROFILE/.m2/repository"
+fi
 COPIED_TRACKER="${DEPENDENCY_DIR}/.parent_poms_copied"
 
 echo "========================================"
