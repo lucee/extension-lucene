@@ -93,7 +93,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: lucene-lex
-          path: target/*.lex
+          path: |
+            target/*.lex
+            !target/*.lite.lex
 
   test:
     runs-on: ubuntu-latest

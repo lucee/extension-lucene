@@ -20,3 +20,4 @@ target/*
 /.vscode
 test.bat
 .flattened-pom.xml
+/maven-deploy.sh
