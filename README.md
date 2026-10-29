@@ -119,6 +119,23 @@ Key test files:
 | `IndexActions.cfc` | Purge, refresh, delete, list |
 | `TagCollection.cfc` | Collection create/delete/repair/optimize |
 
+### Versioning and releases
+
+Works like Lucee core (LDEV-6516): every code change gets its own version number. The version is not edited by hand.
+`pom.xml` uses a CI-friendly `${revision}` built from `extension.version.base`, a build number and
+`extension.version.qualifier` (`-SNAPSHOT`).
+
+* **Every push to `master`** (a merged PR or a direct commit) takes the highest existing build of the base, from the git tags,
+  Maven Central and the Central snapshot repository, adds 1, builds, tests, publishes that version (e.g. `3.0.0.N-SNAPSHOT`)
+  to the [Central snapshot repository](https://central.sonatype.com/repository/maven-snapshots/) and creates the tag `3.0.0.N`.
+* Pushes run one after another (workflow concurrency queue), so two quick merges get two different numbers.
+* PR builds, forks and runs without the deploy secrets build and test `3.0.0.0-SNAPSHOT` and never use up a number.
+* **Release candidate or final release:** run the workflow by hand (Actions > Java CI Combined > Run workflow), choose the branch
+  `master`, tick `deploy` and pick `RC`, `BETA`, `ALPHA` or `release` as qualifier. That publishes the current code once with the
+  next build number (e.g. `3.0.0.N-RC` or `3.0.0.N`) to Maven Central and creates a GitHub release with the `.lex` files,
+  without a commit; the pom keeps `-SNAPSHOT`. The `lucee-versions` input only changes the Lucee versions the tests run against.
+* To start a new line change `extension.version.base`.
+
 ### Project Layout
 
 ```

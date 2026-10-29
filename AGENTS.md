@@ -24,7 +24,7 @@ mvn clean install -Dgoal=install
 
 Output: `target/*.lex`
 
-Deploy snapshot/release (maintainers only):
+Deploy snapshot/release (maintainers only; normally done by the GitHub workflow, see "Versioning and releases" in `README.md`, which passes `-Drevision`):
 
 ```bash
 mvn clean deploy -Dgoal=deploy --settings maven-settings.xml
