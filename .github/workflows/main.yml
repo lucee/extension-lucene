@@ -116,7 +116,7 @@ jobs:
           fi
 
           VERSION="${BASE}.${NEXT_BUILD}${QUALIFIER}"
-          # tag shape matches existing tags (3.0.0.163): numeric 4-part without qualifier
+          # tag shape matches existing tags: numeric 4-part without qualifier
           TAG="${BASE}.${NEXT_BUILD}"
           echo "Resolved VERSION=$VERSION TAG=$TAG (max seen build=${MAX_BUILD:-none})"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
