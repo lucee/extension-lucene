@@ -17,7 +17,7 @@ public class JsonUtil {
 
 	private static void detect(CFMLEngine engine) {
 		if (detected) return;
-		hasCastJson = engine.getInfo().getVersion().getMajor() >= 7;
+		hasCastJson = getCoreMajorVersion(engine) >= 7;
 		if (!hasCastJson) {
 			try {
 				serializeBIF = engine.getClassUtil().loadBIF(engine.getThreadPageContext(), "SerializeJSON");
@@ -27,6 +27,23 @@ public class JsonUtil {
 			}
 		}
 		detected = true;
+	}
+
+	/**
+	 * Reads the major version of the running Lucee core via reflection. Lucee 9.0 changed the return
+	 * type of {@code Info.getVersion()} (LDEV-6627), so a direct call compiled against an older loader
+	 * would fail with NoSuchMethodError. Both version types provide {@code getMajor()}.
+	 */
+	private static int getCoreMajorVersion(CFMLEngine engine) {
+		try {
+			// resolve against the public API types, not the (possibly non-public) implementation classes
+			java.lang.reflect.Method getVersion = lucee.Info.class.getMethod("getVersion");
+			Object version = getVersion.invoke(engine.getInfo());
+			return ((Number) getVersion.getReturnType().getMethod("getMajor").invoke(version)).intValue();
+		}
+		catch (ReflectiveOperationException e) {
+			throw new RuntimeException("unable to read the Lucee core version", e);
+		}
 	}
 
 	public static String serialize(CFMLEngine engine, Struct sct) throws PageException {
