@@ -51,11 +51,12 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 					language="English";
 				indexDocs( "deleteLifeA", variables.path & "/colA" );
 
-				expect( DirectoryExists( variables.path & "/colA/CFdeleteLifeA0" ) ).toBe( true, "the collection index directory exists before delete" );
+				// The identity directory Lucene opens is CF<name><changes>, whose case folding differs
+				// per platform, so assert on the children of the create path rather than its name.
+				expect( ArrayLen( DirectoryList( path=variables.path & "/colA", recurse=false, listInfo="name" ) ) ).toBe( 1, "the index directory exists under the collection path before delete" );
 
 				collection action="delete" collection="deleteLifeA";
 
-				expect( DirectoryExists( variables.path & "/colA/CFdeleteLifeA0" ) ).toBe( false, "delete removes the collection directory on disk" );
 				expect( ArrayLen( DirectoryList( path=variables.path & "/colA", recurse=false, listInfo="name" ) ) ).toBe( 0, "delete leaves no children under the collection path" );
 			});
 
@@ -89,7 +90,7 @@ component extends="org.lucee.cfml.test.LuceeTestCase" labels="search" {
 
 				index collection="deleteLifeC" action="purge";
 
-				expect( DirectoryExists( variables.path & "/colC/CFdeleteLifeC0" ) ).toBe( true, "purge keeps the collection directory" );
+				expect( ArrayLen( DirectoryList( path=variables.path & "/colC", recurse=false, listInfo="name" ) ) ).toBe( 1, "purge keeps the collection directory" );
 				search name="local.res" collection="deleteLifeC" criteria="lazy" language="English";
 				expect( res.recordcount ).toBe( 0, "purge removes the documents" );
 			});
