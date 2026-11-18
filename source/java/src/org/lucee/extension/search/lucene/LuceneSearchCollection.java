@@ -281,7 +281,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			} finally {
 				close(writer);
 			}
-			indexSpellCheck(id);
+			indexComplete(id);
 		}
 		if (getDocumentCount(id) == before)
 			return new IndexResultImpl(0, 0, 1);
@@ -308,7 +308,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			} finally {
 				close(writer);
 			}
-			indexSpellCheck(id);
+			indexComplete(id);
 		}
 
 		return new IndexResultImpl(0, 0, doccount);
@@ -416,7 +416,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			} finally {
 				close(writer);
 			}
-			indexSpellCheck(id);
+			indexComplete(id);
 		}
 		if (getDocumentCount(id) == before)
 			return new IndexResultImpl(0, 0, 1);
@@ -483,7 +483,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			} finally {
 				close(writer);
 			}
-			indexSpellCheck(id);
+			indexComplete(id);
 		}
 		int removes = countBefore - countAfter;
 
@@ -593,7 +593,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			} finally {
 				close(writer);
 			}
-			indexSpellCheck(id);
+			indexComplete(id);
 		}
 		int inserts = countNew - countExisting;
 
@@ -1397,12 +1397,10 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			}
 		}
 		ms.open.incrementAndGet();
-		try {
-			ms.manager.maybeRefresh();
-		} catch (IOException | RuntimeException e) {
-			ms.open.decrementAndGet();
-			throw e;
-		}
+		// No refresh here. The write path refreshes the manager it just wrote, and nothing a read does can
+		// pick up another process's write: Lucene has one writer per directory and a per-process lock
+		// factory, so a directory shared between servers is out of scope - the same way SQLite over a
+		// network share is. LDEV-1166 is documentation, not behaviour to preserve.
 		return ms;
 	}
 
@@ -1418,6 +1416,26 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		} finally {
 			release(ms);
 		}
+	}
+
+	/** Re-open the shared reader for a directory this process just wrote. */
+	private void refreshManaged(File indexDir) throws IOException {
+		ManagedSearcher ms = searchers.get(indexDir.getAbsolutePath());
+		if (ms != null)
+			ms.manager.maybeRefresh();
+	}
+
+	/**
+	 * Close out one index operation: make the new documents visible to this process's shared reader,
+	 * then rebuild the spell dictionary from them.
+	 */
+	private void indexComplete(String id) throws SearchException {
+		try {
+			refreshManaged(_getFile(id, false));
+		} catch (Exception e) {
+			throw CommonUtil.toSearchException(e);
+		}
+		indexSpellCheck(id);
 	}
 
 	private ManagedSpellChecker acquireSpellChecker(File spellDir) throws IOException {
