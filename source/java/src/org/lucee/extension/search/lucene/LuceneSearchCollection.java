@@ -792,7 +792,13 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					String id = files[i].getName();
 					// Acquire the shared searcher for this index directory
 					ManagedSearcher ms = acquireSearcher(_getFile(id, false));
-					IndexSearcher searcher = ms.manager.acquire();
+					IndexSearcher searcher;
+					try {
+						searcher = ms.manager.acquire();
+					} catch (IOException | RuntimeException e) {
+						release(ms);
+						throw e;
+					}
 					managed.add(ms);
 					acquired.add(searcher);
 					IndexReader reader = searcher.getIndexReader();
@@ -1400,12 +1406,17 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		return ms;
 	}
 
+	/** Undo acquireSearcher() when the manager never handed out a searcher. */
+	private static void release(ManagedSearcher ms) {
+		ms.open.decrementAndGet();
+	}
+
 	private static void release(ManagedSearcher ms, IndexSearcher searcher) {
 		try {
 			ms.manager.release(searcher);
 		} catch (IOException e) {
 		} finally {
-			ms.open.decrementAndGet();
+			release(ms);
 		}
 	}
 
