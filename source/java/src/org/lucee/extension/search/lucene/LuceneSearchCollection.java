@@ -1332,20 +1332,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		return writers;
 	}
 
-	private int _countDocs(String col) {
-		int totalDocs;
-		IndexReader reader = null;
-		try {
-			reader = _getReader(col, true);
-			totalDocs = reader.numDocs();
-		} catch (Exception e) {
-			return 0;
-		} finally {
-			closeEL(reader);
-		}
-		return totalDocs;
-	}
-
 	/**
 	 * @deprecated see SearchUtil.getAnalyzer(String language);
 	 * @param language
