@@ -334,24 +334,24 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			return;
 
 		IndexReader reader = null;
-		FSDirectory spellDir = null;
-		SpellChecker spellChecker = null;
+		ManagedSpellChecker ms = null;
 
-		Resource dir = _createSpellDirectory(id);
 		try {
-			spellDir = FSDirectory.open(engine.getCastUtil().toFile(dir).toPath());
-			spellChecker = new SpellChecker(spellDir);
+			_removeLegacySpellDirs(id);
+			// The same instance the search path reads from, so SpellChecker's own swapSearcher() makes the
+			// rebuilt dictionary visible to the next suggestSimilar instead of handing a second instance a
+			// directory nobody refreshes.
+			ms = acquireSpellChecker(engine.getCastUtil().toFile(_getSpellDirectory(id)));
 
 			reader = _getReader(id, false);
 			Dictionary dictionary = new LuceneDictionary(reader, "contents");
 
-			spellChecker.indexDictionary(dictionary, _getConfig(), true);
+			ms.checker.indexDictionary(dictionary, _getConfig(), true);
 
 		} catch (Exception e) {
 			throw CommonUtil.toSearchException(e);
 		} finally {
-			if (spellChecker != null) try { spellChecker.close(); } catch (Exception e) {}
-			if (spellDir != null) try { spellDir.close(); } catch (Exception e) {}
+			if (ms != null) release(ms);
 			closeEL(reader);
 		}
 	}
@@ -1494,8 +1494,17 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	 */
 	private Resource[] _getIndexDirectories() {
 		Resource[] files = collectionDir.listResources(new DirectoryResourceFilter());
+		if (files == null)
+			return new Resource[0];
 
-		return files;
+		// The spell dictionary sits beside the index directories, and an IndexWriter over it would corrupt
+		// the dictionary, so it is never part of the index list.
+		ArrayList<Resource> indexes = new ArrayList<>();
+		for (int i = 0; i < files.length; i++) {
+			if (!files[i].getName().endsWith("_spell"))
+				indexes.add(files[i]);
+		}
+		return indexes.toArray(new Resource[indexes.size()]);
 	}
 
 	/**
@@ -1635,45 +1644,41 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		}
 	}
 
-	private Resource _createSpellDirectory(String id) {
-		Resource indexDir = collectionDir.getRealResource(id + "_" + (_getMax(true) + 1) + "_spell");
-		// print.out("create:"+indexDir);
+	/**
+	 * One dictionary directory per index, created once. A rebuild writes into it rather than wiping it, so a
+	 * cached SpellChecker keeps a directory that still exists and its own indexDictionary() swap is what the
+	 * next suggestion reads.
+	 */
+	private Resource _getSpellDirectory(String id) {
+		Resource indexDir = collectionDir.getRealResource(id + "_spell");
 		indexDir.mkdirs();
 		return indexDir;
 	}
 
-	private Resource _getSpellDirectory(String id) {
-		Resource indexDir = collectionDir.getRealResource(id + "_" + _getMax(false) + "_spell");
-		// print.out("get:"+indexDir);
-		return indexDir;
+	/**
+	 * The old layout was <id>_<n>_spell, one directory per rebuild. Nothing adopts them: the next write
+	 * rebuilds from scratch into <id>_spell, which leaves the numbered ones inert, so they are removed
+	 * rather than followed.
+	 */
+	private void _removeLegacySpellDirs(String id) {
+		String keep = id + "_spell";
+		Resource[] children = collectionDir.listResources(new SpellDirFilter());
+		for (int i = 0; i < children.length; i++) {
+			if (children[i].getName().equalsIgnoreCase(keep))
+				continue;
+			try {
+				children[i].remove(true);
+			} catch (Throwable t) {
+				if (t instanceof ThreadDeath)
+					throw (ThreadDeath) t;
+			}
+		}
 	}
 
 	public Resource getRootDirectory() {
 		return collectionDir;
 	}
 
-	private long _getMax(boolean delete) {
-		Resource[] children = collectionDir.listResources(new SpellDirFilter());
-		long max = 0, nbr;
-		String name;
-		for (int i = 0; i < children.length; i++) {
-			name = children[i].getName();
-			name = name.substring(0, name.length() - 6);
-			nbr = engine.getCastUtil().toLongValue(name.substring(name.lastIndexOf('_') + 1), 0);
-			if (delete) {
-				try {
-					children[i].remove(true);
-					continue;
-				} catch (Throwable t) {
-					if (t instanceof ThreadDeath)
-						throw (ThreadDeath) t;
-				}
-			}
-			if (nbr > max)
-				max = nbr;
-		}
-		return max;
-	}
 
 	private void error(Exception e) {
 		if (log == null) {
