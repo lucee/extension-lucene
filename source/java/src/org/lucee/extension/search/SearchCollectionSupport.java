@@ -637,12 +637,9 @@ public abstract class SearchCollectionSupport implements SearchCollection {
 		SearchResulItem[] records;
 		boolean hasRowHandling = false;
 
-		Lock l = lock();
-		try {
-			records = _search(data, criteria, language, type, startrow, maxrow, categoryTree, categories);
-		} finally {
-			unlock(l);
-		}
+		// no lock: IndexReader and IndexSearcher are thread-safe and the shared SearcherManager
+		// refcounts the sub-readers, so a read never needs the collection's exclusive lock
+		records = _search(data, criteria, language, type, startrow, maxrow, categoryTree, categories);
 
 		// Startrow
 		if (!hasRowHandling && startrow > 1) {
