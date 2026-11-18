@@ -700,7 +700,6 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					if (removeCorrupt(files[i]))
 						continue;
 
-					String strFile = files[i].toString();
 					SearchIndex si = indexes.get(files[i].getName());
 					if (si == null)
 						continue;
@@ -715,10 +714,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 						continue;
 
 					String id = files[i].getName();
-					data.addRecordsSearched(_countDocs(strFile));
-
 					// Add this reader and ID to our lists
 					IndexReader reader = _getReader(id, false);
+					data.addRecordsSearched(reader.numDocs());
 					readers.add(reader);
 					indexIds.add(id);
 
