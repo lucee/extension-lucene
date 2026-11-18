@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -38,6 +39,7 @@ import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.highlight.Formatter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
@@ -124,6 +126,58 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 	private Map<String, EmbeddingService> embeddingServices = new ConcurrentHashMap<>();
 
 	private static final SerializableObject token = new SerializableObject();
+
+	/**
+	 * Shared searchers keyed by the absolute path of the directory Lucene opens. Static so a
+	 * replacement engine instance or an extension update reuses the reader instead of opening a
+	 * second one over the same index. open counts the cursors handed to in-flight queries.
+	 */
+	private static final Map<String, ManagedSearcher> searchers = new ConcurrentHashMap<>();
+	private static final Map<String, ManagedSpellChecker> spellCheckers = new ConcurrentHashMap<>();
+
+	private static final class ManagedSearcher {
+		final SearcherManager manager;
+		final FSDirectory dir;
+		final AtomicInteger open = new AtomicInteger();
+
+		ManagedSearcher(SearcherManager manager, FSDirectory dir) {
+			this.manager = manager;
+			this.dir = dir;
+		}
+
+		void closeQuietly() {
+			try {
+				manager.close();
+			} catch (IOException e) {
+			}
+			try {
+				dir.close();
+			} catch (IOException e) {
+			}
+		}
+	}
+
+	private static final class ManagedSpellChecker {
+		final SpellChecker checker;
+		final FSDirectory dir;
+		final AtomicInteger open = new AtomicInteger();
+
+		ManagedSpellChecker(SpellChecker checker, FSDirectory dir) {
+			this.checker = checker;
+			this.dir = dir;
+		}
+
+		void closeQuietly() {
+			try {
+				checker.close();
+			} catch (IOException e) {
+			}
+			try {
+				dir.close();
+			} catch (IOException e) {
+			}
+		}
+	}
 
 	public LuceneSearchCollection(SearchEngineSupport searchEngine, String name, Resource path, String language,
 			DateTime lastUpdate, DateTime created) throws SearchException {
@@ -562,7 +616,12 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		for (int i = 0; i < indexes.length; i++) {
 			count += getDocumentCount(indexes[i].getId());
 		}
-		engine.getResourceUtil().removeChildrenSilent(collectionDir);
+		dropManaged(collectionDir);
+		try {
+			engine.getResourceUtil().removeChildren(collectionDir);
+		} catch (IOException e) {
+			throw CommonUtil.toSearchException(e);
+		}
 		return new IndexResultImpl(count, 0, 0);
 	}
 
@@ -573,14 +632,29 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 		for (int i = 0; i < indexes.length; i++) {
 			count += getDocumentCount(indexes[i].getId());
 		}
-		engine.getResourceUtil().removeSilent(collectionDir, true);
+		dropManaged(collectionDir);
+		if (collectionDir.exists()) {
+			try {
+				collectionDir.remove(true);
+			} catch (IOException e) {
+				throw CommonUtil.toSearchException(e);
+			}
+		}
 		return new IndexResultImpl(count, 0, 0);
 	}
 
 	@Override
 	protected IndexResult _deleteIndex(String id) throws SearchException {
 		int count = getDocumentCount(id);
-		engine.getResourceUtil().removeSilent(_getIndexDirectory(id, true), true);
+		dropManaged(_getIndexDirectory(id, true));
+		Resource indexDir = _getIndexDirectory(id, true);
+		if (indexDir.exists()) {
+			try {
+				indexDir.remove(true);
+			} catch (IOException e) {
+				throw CommonUtil.toSearchException(e);
+			}
+		}
 		return new IndexResultImpl(count, 0, 0);
 	}
 
@@ -694,6 +768,8 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 			// Create a list to hold all valid readers
 			List<IndexReader> readers = new ArrayList<>();
 			List<String> indexIds = new ArrayList<>();
+			List<ManagedSearcher> managed = new ArrayList<>();
+			List<IndexSearcher> acquired = new ArrayList<>();
 			try {
 				// create the readers
 				for (int i = 0; i < files.length; i++) {
@@ -714,8 +790,12 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 						continue;
 
 					String id = files[i].getName();
-					// Add this reader and ID to our lists
-					IndexReader reader = _getReader(id, false);
+					// Acquire the shared searcher for this index directory
+					ManagedSearcher ms = acquireSearcher(_getFile(id, false));
+					IndexSearcher searcher = ms.manager.acquire();
+					managed.add(ms);
+					acquired.add(searcher);
+					IndexReader reader = searcher.getIndexReader();
 					data.addRecordsSearched(reader.numDocs());
 					readers.add(reader);
 					indexIds.add(id);
@@ -798,9 +878,9 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				}
 
 			} finally {
-				// Close all readers
-				for (IndexReader reader : readers) {
-					close(reader);
+				// Release the acquired searchers, the manager owns the reader now
+				for (int i = 0; i < managed.size(); i++) {
+					release(managed.get(i), acquired.get(i));
 				}
 			}
 
@@ -817,12 +897,10 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 				while (it.hasNext()) {
 					id = it.next();
 					SuggestionItemImpl si;
-					SpellChecker sc = null;
-					FSDirectory siDir = null;
+					ManagedSpellChecker ms = null;
 					try {
-						siDir = FSDirectory.open(engine.getCastUtil().toFile(_getSpellDirectory(id)).toPath());
-						sc = new SpellChecker(siDir);
-
+						ms = acquireSpellChecker(engine.getCastUtil().toFile(_getSpellDirectory(id)));
+						SpellChecker sc = ms.checker;
 						for (int i = 0; i < strLiterals.length; i++) {
 							int maxSuggestions = Math.min(data.getSuggestionMax(), 10);
 							String[] arr = sc.suggestSimilar(strLiterals[i], maxSuggestions);
@@ -846,8 +924,7 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 					} catch (Exception e) {
 						error(e);
 					} finally {
-						if (sc != null) try { sc.close(); } catch (Exception e) {}
-						if (siDir != null) try { siDir.close(); } catch (Exception e) {}
+						if (ms != null) release(ms);
 					}
 				}
 				if (setSuggestionQuery) {
@@ -1292,6 +1369,106 @@ public final class LuceneSearchCollection extends SearchCollectionSupport {
 
 		// Open reader using DirectoryReader
 		return DirectoryReader.open(dir);
+	}
+
+	private ManagedSearcher acquireSearcher(File indexDir) throws IOException {
+		String path = indexDir.getAbsolutePath();
+		ManagedSearcher ms = searchers.get(path);
+		if (ms == null) {
+			FSDirectory dir = FSDirectory.open(indexDir.toPath());
+			if (!DirectoryReader.indexExists(dir)) {
+				dir.close();
+				throw new IOException("there is no index in [" + path + "]");
+			}
+			// Created outside the map, so the reader open never runs under a bin lock
+			ManagedSearcher created = new ManagedSearcher(new SearcherManager(dir, null), dir);
+			ms = searchers.putIfAbsent(path, created);
+			if (ms == null) {
+				ms = created;
+			}
+			else {
+				created.closeQuietly();
+			}
+		}
+		ms.open.incrementAndGet();
+		try {
+			ms.manager.maybeRefresh();
+		} catch (IOException | RuntimeException e) {
+			ms.open.decrementAndGet();
+			throw e;
+		}
+		return ms;
+	}
+
+	private static void release(ManagedSearcher ms, IndexSearcher searcher) {
+		try {
+			ms.manager.release(searcher);
+		} catch (IOException e) {
+		} finally {
+			ms.open.decrementAndGet();
+		}
+	}
+
+	private ManagedSpellChecker acquireSpellChecker(File spellDir) throws IOException {
+		String path = spellDir.getAbsolutePath();
+		ManagedSpellChecker ms = spellCheckers.get(path);
+		if (ms == null) {
+			FSDirectory dir = FSDirectory.open(spellDir.toPath());
+			ManagedSpellChecker created = new ManagedSpellChecker(new SpellChecker(dir), dir);
+			ms = spellCheckers.putIfAbsent(path, created);
+			if (ms == null) {
+				ms = created;
+			}
+			else {
+				created.closeQuietly();
+			}
+		}
+		ms.open.incrementAndGet();
+		return ms;
+	}
+
+	private static void release(ManagedSpellChecker ms) {
+		ms.open.decrementAndGet();
+	}
+
+	/**
+	 * Drop every managed reader under a directory, refusing to close one an in-flight query still
+	 * holds. Closing before the delete is what lets the directory actually be removed on Windows.
+	 */
+	private void dropManaged(Resource dir) throws SearchException {
+		String prefix;
+		try {
+			// Same resolution the registry keys use, so the prefix actually matches
+			prefix = engine.getCastUtil().toFile(dir).getAbsolutePath();
+		} catch (PageException e) {
+			throw CommonUtil.toSearchException(e);
+		}
+
+		for (String key : searchers.keySet()) {
+			if (!key.startsWith(prefix))
+				continue;
+			ManagedSearcher ms = searchers.remove(key);
+			if (ms == null)
+				continue;
+			if (ms.open.get() > 0) {
+				searchers.put(key, ms);
+				throw new SearchException("index at [" + key + "] is still in use");
+			}
+			ms.closeQuietly();
+		}
+
+		for (String key : spellCheckers.keySet()) {
+			if (!key.startsWith(prefix))
+				continue;
+			ManagedSpellChecker ms = spellCheckers.remove(key);
+			if (ms == null)
+				continue;
+			if (ms.open.get() > 0) {
+				spellCheckers.put(key, ms);
+				throw new SearchException("spell index at [" + key + "] is still in use");
+			}
+			ms.closeQuietly();
+		}
 	}
 
 	private File _getFile(String id, boolean absolute) throws IOException, PageException {
